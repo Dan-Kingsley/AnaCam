@@ -26,13 +26,16 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Decode keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
-          echo "KEYSTORE_PATH=release.jks" >> $GITHUB_ENV
-          echo "Keystore decoded successfully"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+            echo "KEYSTORE_PATH=release.jks" >> $GITHUB_ENV
+            echo "Keystore decoded successfully"
+          else
+            echo "No keystore secret found, will build unsigned APK"
+          fi
 
       - name: Build release APK
         env:
