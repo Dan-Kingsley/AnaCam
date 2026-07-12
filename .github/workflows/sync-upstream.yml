@@ -1,0 +1,32 @@
+name: Sync Upstream SourceForge
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Runs daily at 2:00 AM UTC
+  workflow_dispatch: # Allows you to run it manually from the GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync Master branch with Upstream
+        run: |
+          # Configure Git
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+          # Add SourceForge as upstream
+          git remote add upstream https://git.code.sf.net/p/opencamera/code
+          git fetch upstream
+
+          # Switch to master and hard reset to match SourceForge exactly
+          git checkout master
+          git reset --hard upstream/master
+
+          # Force push to GitHub's master branch
+          git push origin master --force
