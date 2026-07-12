@@ -3422,6 +3422,12 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         // I have received crashes where camera_controller was null - could perhaps happen if this thread was running just as the camera is closing?
         boolean is_front_facing = main_activity.getPreview().getCameraController() != null && (main_activity.getPreview().getCameraController().getFacing() == CameraController.Facing.FACING_FRONT);
         boolean mirror = is_front_facing && sharedPreferences.getString(PreferenceKeys.FrontCameraMirrorKey, "preference_front_camera_mirror_no").equals("preference_front_camera_mirror_photo");
+        float anamorphic_desqueeze_factor = 1.0f;
+        String anamorphic_pref = sharedPreferences.getString(PreferenceKeys.AnamorphicDesqueezePreferenceKey, "preference_anamorphic_desqueeze_off");
+        switch( anamorphic_pref ) {
+            case "preference_anamorphic_desqueeze_1_33": anamorphic_desqueeze_factor = 1.33f; break;
+            case "preference_anamorphic_desqueeze_1_55": anamorphic_desqueeze_factor = 1.55f; break;
+        }
         String preference_stamp = this.getStampPref();
         String preference_textstamp = this.getTextStampPref();
         int font_size = getTextStampFontSizePref();
@@ -3569,7 +3575,8 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                         store_location, location, store_geo_direction, geo_direction,
                         pitch_angle, store_ypr,
                         custom_tag_artist, custom_tag_copyright,
-                        sample_factor);
+                        sample_factor,
+                        anamorphic_desqueeze_factor);
 
                 if( photo_mode == PhotoMode.Panorama ) {
                     imageSaver.getImageBatchRequest().camera_view_angle_x = main_activity.getPreview().getViewAngleX(false);
@@ -3647,7 +3654,8 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                     store_location, location, store_geo_direction, geo_direction,
                     pitch_angle, store_ypr,
                     custom_tag_artist, custom_tag_copyright,
-                    sample_factor);
+                    sample_factor,
+                    anamorphic_desqueeze_factor);
         }
 
         if( MyDebug.LOG )

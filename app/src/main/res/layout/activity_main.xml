@@ -446,6 +446,21 @@
         android:visibility="gone"
         />
 
+    <ImageButton
+        android:id="@+id/anamorphic_desqueeze"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/anamorphic_desqueeze_enable"
+        app:srcCompat="@drawable/anamorphic_off"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedAnamorphicDesqueeze"
+        android:visibility="gone"
+        />
+
     <ImageView
         android:id="@+id/kraken_icon"
         android:layout_width="@dimen/onscreen_button_size"

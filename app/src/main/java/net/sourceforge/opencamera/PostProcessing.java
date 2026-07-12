@@ -265,6 +265,46 @@ public class PostProcessing {
         return bitmap;
     }
 
+    /** Applies anamorphic desqueeze to the image.
+     * @param data The jpeg data.
+     * @param bitmap Optional argument - the bitmap if already unpacked from the jpeg data.
+     * @param factor The desqueeze factor (1.33f or 1.55f).
+     * @return A bitmap representing the desqueezed jpeg.
+     */
+    private static Bitmap desqueezeImage(byte [] data, Bitmap bitmap, float factor) {
+        if( MyDebug.LOG ) {
+            Log.d(TAG, "desqueezeImage");
+            Log.d(TAG, "factor: " + factor);
+        }
+        if( factor == 1.0f ) {
+            return bitmap;
+        }
+        if( bitmap == null ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "need to decode bitmap to desqueeze");
+            bitmap = ImageUtils.loadBitmapWithRotation(data, false);
+            if( bitmap == null ) {
+                System.gc();
+                return null;
+            }
+        }
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        int newWidth = (int)(width * factor);
+        if( MyDebug.LOG ) {
+            Log.d(TAG, "original size: " + width + " x " + height);
+            Log.d(TAG, "new width: " + newWidth);
+        }
+        Matrix matrix = new Matrix();
+        matrix.postScale((float)newWidth / width, 1.0f);
+        Bitmap new_bitmap = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true);
+        if( new_bitmap != bitmap ) {
+            bitmap.recycle();
+            bitmap = new_bitmap;
+        }
+        return bitmap;
+    }
+
     /** Applies any photo stamp options (if they exist).
      * @param data The jpeg data.
      * @param bitmap Optional argument - the bitmap if already unpacked from the jpeg data.
@@ -538,6 +578,9 @@ public class PostProcessing {
         }
         if( request.mirror ) {
             bitmap = mirrorImage(data, bitmap);
+        }
+        if( request.anamorphic_desqueeze_factor != 1.0f ) {
+            bitmap = desqueezeImage(data, bitmap, request.anamorphic_desqueeze_factor);
         }
         if( request.image_format != ImageSaver.Request.ImageFormat.STD && bitmap == null ) {
             if( MyDebug.LOG )

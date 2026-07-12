@@ -13,6 +13,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: master
 
       - name: Sync Master branch with Upstream
         run: |
@@ -21,7 +22,7 @@ jobs:
           git config user.email "actions@github.com"
 
           # Add SourceForge as upstream
-          git remote add upstream https://git.code.sf.net/p/opencamera/code
+          git remote add upstream https://git.code.sf.net/p/opencamera/code || true
           git fetch upstream
 
           # Switch to master and hard reset to match SourceForge exactly
@@ -30,3 +31,17 @@ jobs:
 
           # Force push to GitHub's master branch
           git push origin master --force
+
+      - name: Rebase AnaCam branch on updated Master
+        run: |
+          # Checkout AnaCam branch
+          git checkout AnaCam || git checkout -b AnaCam origin/AnaCam
+
+          # Rebase on top of the updated master
+          git rebase master || {
+            echo "Rebase failed - conflicts need manual resolution"
+            exit 1
+          }
+
+          # Force push the rebased AnaCam branch
+          git push origin AnaCam --force

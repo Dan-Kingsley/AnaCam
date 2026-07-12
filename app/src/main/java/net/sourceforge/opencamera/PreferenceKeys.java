@@ -391,4 +391,8 @@ public class PreferenceKeys {
     public static final String AddYPRToComments="preference_comment_ypr";
 
     public static final String GalleryPreferenceKey = "preference_gallery";
+
+    public static final String AnamorphicDesqueezePreferenceKey = "preference_anamorphic_desqueeze";
+
+    public static final String ShowAnamorphicDesqueezePreferenceKey = "preference_show_anamorphic_desqueeze";
 }

@@ -44,6 +44,7 @@ public class OnScreenIcons {
     private final ToastBoxer face_detection_toast = new ToastBoxer();
     private final ToastBoxer cycle_lock_orientation_toast = new ToastBoxer();
     private final ToastBoxer preview_shots_toast = new ToastBoxer();
+    private final ToastBoxer anamorphic_desqueeze_toast = new ToastBoxer();
 
     public OnScreenIcons(MainActivity main_activity) {
         if( MyDebug.LOG )
@@ -67,6 +68,7 @@ public class OnScreenIcons {
         buttons.add(main_activity.findViewById(R.id.audio_control));
         buttons.add(main_activity.findViewById(R.id.cycle_lock_orientation));
         buttons.add(main_activity.findViewById(R.id.preview_shots));
+        buttons.add(main_activity.findViewById(R.id.anamorphic_desqueeze));
     }
 
     public void updateOnScreenIcons() {
@@ -84,6 +86,7 @@ public class OnScreenIcons {
         this.updateFaceDetectionIcon();
         this.updateCycleLockOrientationIcon();
         this.updatePreviewShotsIcon();
+        this.updateAnamorphicDesqueezeIcon();
     }
 
     private void updateExposureLockIcon() {
@@ -226,6 +229,19 @@ public class OnScreenIcons {
         view.setContentDescription( main_activity.getResources().getString(enabled ? R.string.preview_shots_disable : R.string.preview_shots_enable) );
     }
 
+    private void updateAnamorphicDesqueezeIcon() {
+        ImageButton view = main_activity.findViewById(R.id.anamorphic_desqueeze);
+        boolean enabled = isAnamorphicDesqueezeEnabled();
+        view.setImageResource(enabled ? R.drawable.anamorphic_on : R.drawable.anamorphic_off);
+        view.setContentDescription( main_activity.getResources().getString(enabled ? R.string.anamorphic_desqueeze_disable : R.string.anamorphic_desqueeze_enable) );
+    }
+
+    private boolean isAnamorphicDesqueezeEnabled() {
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+        String value = sharedPreferences.getString(PreferenceKeys.AnamorphicDesqueezePreferenceKey, "preference_anamorphic_desqueeze_off");
+        return !value.equals("preference_anamorphic_desqueeze_off");
+    }
+
     /** Sets the visibility flag for on-screen icons.
      * @param visibility Visibility flag.
      * @param visibility_video Visibility flag to use for icons that are still allowed when recording video
@@ -244,6 +260,7 @@ public class OnScreenIcons {
         View audioControlButton = main_activity.findViewById(R.id.audio_control);
         View cycleLockOrientationButton = main_activity.findViewById(R.id.cycle_lock_orientation);
         View previewShotsButton = main_activity.findViewById(R.id.preview_shots);
+        View anamorphicDesqueezeButton = main_activity.findViewById(R.id.anamorphic_desqueeze);
 
         if( showExposureLockIcon() )
             exposureLockButton.setVisibility(visibility_video); // still allow exposure lock when recording video
@@ -271,6 +288,8 @@ public class OnScreenIcons {
             cycleLockOrientationButton.setVisibility(visibility);
         if( showPreviewShotsIcon() )
             previewShotsButton.setVisibility(visibility);
+        if( showAnamorphicDesqueezeIcon() )
+            anamorphicDesqueezeButton.setVisibility(visibility);
     }
 
     /** Disables the optional on-screen icons if either user doesn't want to enable them, or not
@@ -348,6 +367,11 @@ public class OnScreenIcons {
         }
         if( !showPreviewShotsIcon() ) {
             View button = main_activity.findViewById(R.id.preview_shots);
+            changed = changed || (button.getVisibility() != View.GONE);
+            button.setVisibility(View.GONE);
+        }
+        if( !showAnamorphicDesqueezeIcon() ) {
+            View button = main_activity.findViewById(R.id.anamorphic_desqueeze);
             changed = changed || (button.getVisibility() != View.GONE);
             button.setVisibility(View.GONE);
         }
@@ -472,6 +496,11 @@ public class OnScreenIcons {
         }
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
         return sharedPreferences.getBoolean(PreferenceKeys.ShowPreviewShotsPreferenceKey, false);
+    }
+
+    private boolean showAnamorphicDesqueezeIcon() {
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+        return sharedPreferences.getBoolean(PreferenceKeys.ShowAnamorphicDesqueezePreferenceKey, false);
     }
 
     public void clickedExposureLock() {
@@ -776,5 +805,28 @@ public class OnScreenIcons {
         updatePreviewShotsIcon();
         main_activity.getApplicationInterface().getDrawPreview().updateSettings(); // needed to update preview shots
         main_activity.getPreview().showToast(preview_shots_toast, value ? R.string.preview_shots_enabled : R.string.preview_shots_disabled, true);
+    }
+
+    public void clickedAnamorphicDesqueeze() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "clickedAnamorphicDesqueeze");
+
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+        String currentValue = sharedPreferences.getString(PreferenceKeys.AnamorphicDesqueezePreferenceKey, "preference_anamorphic_desqueeze_off");
+        String newValue;
+        if( currentValue.equals("preference_anamorphic_desqueeze_off") ) {
+            newValue = "preference_anamorphic_desqueeze_1_33";
+        }
+        else {
+            newValue = "preference_anamorphic_desqueeze_off";
+        }
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(PreferenceKeys.AnamorphicDesqueezePreferenceKey, newValue);
+        editor.apply();
+
+        updateAnamorphicDesqueezeIcon();
+        main_activity.getPreview().updateAnamorphicDesqueeze();
+        boolean enabled = !newValue.equals("preference_anamorphic_desqueeze_off");
+        main_activity.getPreview().showToast(anamorphic_desqueeze_toast, enabled ? R.string.anamorphic_desqueeze_on : R.string.anamorphic_desqueeze_off, true);
     }
 }

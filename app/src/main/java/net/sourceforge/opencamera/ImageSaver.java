@@ -175,6 +175,7 @@ public class ImageSaver extends Thread {
         final String custom_tag_artist;
         final String custom_tag_copyright;
         final int sample_factor; // sampling factor for thumbnail, higher means lower quality
+        final float anamorphic_desqueeze_factor; // 1.0f for no desqueeze, 1.33f or 1.55f for anamorphic
 
         Request(Type type,
                 ProcessType process_type,
@@ -205,7 +206,8 @@ public class ImageSaver extends Thread {
                 double pitch_angle, boolean store_ypr,
                 String custom_tag_artist,
                 String custom_tag_copyright,
-                int sample_factor) {
+                int sample_factor,
+                float anamorphic_desqueeze_factor) {
             this.type = type;
             this.process_type = process_type;
             this.force_suffix = force_suffix;
@@ -252,6 +254,7 @@ public class ImageSaver extends Thread {
             this.custom_tag_artist = custom_tag_artist;
             this.custom_tag_copyright = custom_tag_copyright;
             this.sample_factor = sample_factor;
+            this.anamorphic_desqueeze_factor = anamorphic_desqueeze_factor;
         }
 
         /** Returns a copy of this object. Note that it is not a deep copy - data such as JPEG and RAW
@@ -285,7 +288,8 @@ public class ImageSaver extends Thread {
                     this.pitch_angle, this.store_ypr,
                     this.custom_tag_artist,
                     this.custom_tag_copyright,
-                    this.sample_factor);
+                    this.sample_factor,
+                    this.anamorphic_desqueeze_factor);
         }
     }
 
@@ -508,7 +512,8 @@ public class ImageSaver extends Thread {
                     false, Request.RemoveDeviceExif.OFF, false, null, false, 0.0,
                     0.0, false,
                     null, null,
-                    1);
+                    1,
+                    1.0f);
             if( MyDebug.LOG )
                 Log.d(TAG, "add on_destroy request");
             addRequest(request, 1);
@@ -643,7 +648,8 @@ public class ImageSaver extends Thread {
                           double pitch_angle, boolean store_ypr,
                           String custom_tag_artist,
                           String custom_tag_copyright,
-                          int sample_factor) {
+                          int sample_factor,
+                          float anamorphic_desqueeze_factor) {
         if( MyDebug.LOG ) {
             Log.d(TAG, "saveImageJpeg");
             Log.d(TAG, "do_in_background? " + do_in_background);
@@ -677,7 +683,8 @@ public class ImageSaver extends Thread {
                 pitch_angle, store_ypr,
                 custom_tag_artist,
                 custom_tag_copyright,
-                sample_factor);
+                sample_factor,
+                anamorphic_desqueeze_factor);
     }
 
     /** Saves a RAW photo.
@@ -722,7 +729,8 @@ public class ImageSaver extends Thread {
                 false, Request.RemoveDeviceExif.OFF, false, null, false, 0.0,
                 0.0, false,
                 null, null,
-                1);
+                1,
+                1.0f);
     }
 
     private Request pending_image_average_request = null;
@@ -753,7 +761,8 @@ public class ImageSaver extends Thread {
                            double pitch_angle, boolean store_ypr,
                            String custom_tag_artist,
                            String custom_tag_copyright,
-                           int sample_factor) {
+                           int sample_factor,
+                           float anamorphic_desqueeze_factor) {
         if( MyDebug.LOG ) {
             Log.d(TAG, "startImageBatch");
             Log.d(TAG, "do_in_background? " + do_in_background);
@@ -785,7 +794,8 @@ public class ImageSaver extends Thread {
                 pitch_angle, store_ypr,
                 custom_tag_artist,
                 custom_tag_copyright,
-                sample_factor);
+                sample_factor,
+                anamorphic_desqueeze_factor);
     }
 
     void addImageBatch(byte [] image, float [] gyro_rotation_matrix) {
@@ -870,7 +880,8 @@ public class ImageSaver extends Thread {
                               double pitch_angle, boolean store_ypr,
                               String custom_tag_artist,
                               String custom_tag_copyright,
-                              int sample_factor) {
+                              int sample_factor,
+                              float anamorphic_desqueeze_factor) {
         if( MyDebug.LOG ) {
             Log.d(TAG, "saveImage");
             Log.d(TAG, "do_in_background? " + do_in_background);
@@ -906,7 +917,8 @@ public class ImageSaver extends Thread {
                 pitch_angle, store_ypr,
                 custom_tag_artist,
                 custom_tag_copyright,
-                sample_factor);
+                sample_factor,
+                anamorphic_desqueeze_factor);
 
         if( do_in_background ) {
             if( MyDebug.LOG )
@@ -1018,7 +1030,8 @@ public class ImageSaver extends Thread {
                 false, Request.RemoveDeviceExif.OFF, false, null, false, 0.0,
                 0.0, false,
                 null, null,
-                1);
+                1,
+                1.0f);
         if( MyDebug.LOG )
             Log.d(TAG, "add dummy request");
         addRequest(dummy_request, 1); // cost must be 1, so we don't have infinite recursion!

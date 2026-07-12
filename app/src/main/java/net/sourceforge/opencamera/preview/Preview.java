@@ -6,6 +6,7 @@ import net.sourceforge.opencamera.JavaImageProcessing;
 import net.sourceforge.opencamera.cameracontroller.RawImage;
 //import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyDebug;
+import net.sourceforge.opencamera.PreferenceKeys;
 import net.sourceforge.opencamera.R;
 import net.sourceforge.opencamera.TakePhoto;
 import net.sourceforge.opencamera.ToastBoxer;
@@ -47,6 +48,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -94,6 +96,7 @@ import android.view.WindowManager;
 import android.view.View.MeasureSpec;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.preference.PreferenceManager;
 import android.widget.Toast;
 
 /** This class was originally named due to encapsulating the camera preview,
@@ -1182,7 +1185,29 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
         else if( rotation == Surface.ROTATION_180 ) {
             matrix.postRotate(180, centerX, centerY);
         }
+        float desqueeze = getAnamorphicDesqueezeFactor();
+        if( desqueeze != 1.0f ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "applying anamorphic desqueeze: " + desqueeze);
+            matrix.postScale(desqueeze, 1.0f, centerX, centerY);
+        }
         cameraSurface.setTransform(matrix);
+    }
+
+    public float getAnamorphicDesqueezeFactor() {
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getContext());
+        String value = sharedPreferences.getString(PreferenceKeys.AnamorphicDesqueezePreferenceKey, "preference_anamorphic_desqueeze_off");
+        switch( value ) {
+            case "preference_anamorphic_desqueeze_1_33": return 1.33f;
+            case "preference_anamorphic_desqueeze_1_55": return 1.55f;
+            default: return 1.0f;
+        }
+    }
+
+    public void updateAnamorphicDesqueeze() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "updateAnamorphicDesqueeze");
+        configureTransform();
     }
 
     public void stopVideo(boolean from_restart) {

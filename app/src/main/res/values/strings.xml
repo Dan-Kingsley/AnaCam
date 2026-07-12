@@ -1043,6 +1043,13 @@
     <string name="preview_shots_enabled">Preview shots enabled</string>
     <string name="preview_shots_disabled">Preview shots disabled</string>
 
+    <string name="preference_show_anamorphic_desqueeze">Show anamorphic icon</string>
+    <string name="preference_show_anamorphic_desqueeze_summary">Whether to show an on-screen icon for anamorphic desqueeze</string>
+    <string name="anamorphic_desqueeze_enable">Enable anamorphic desqueeze</string>
+    <string name="anamorphic_desqueeze_disable">Disable anamorphic desqueeze</string>
+    <string name="anamorphic_desqueeze_off">Anamorphic desqueeze off</string>
+    <string name="anamorphic_desqueeze_on">Anamorphic desqueeze on</string>
+
     <string name="preference_gallery">Gallery</string>
     <string name="preference_gallery_summary">The thumbnail icon opens a gallery app installed on your device. If your preferred gallery app does not show as an option, try changing this option.\n%s</string>
     <string name="preference_gallery_include_legacy">Default</string>

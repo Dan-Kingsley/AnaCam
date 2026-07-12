@@ -126,6 +126,15 @@
         android:defaultValue="false"
         />
 
+    <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
+    <CheckBoxPreference
+        android:key="preference_show_anamorphic_desqueeze"
+        android:title="@string/preference_show_anamorphic_desqueeze"
+        android:summary="@string/preference_show_anamorphic_desqueeze_summary"
+        android:icon="@drawable/anamorphic_off"
+        android:defaultValue="false"
+        />
+
     <CheckBoxPreference
         android:key="preference_show_zoom_slider_controls"
         android:title="@string/preference_show_zoom_slider_controls"

@@ -1060,4 +1060,14 @@
         <item>preference_gallery_exclude_legacy</item>
         <item>preference_gallery_all_editors</item>
     </string-array>
+    <string-array name="preference_anamorphic_desqueeze_entries">
+        <item>Off</item>
+        <item>1.33x</item>
+        <item>1.55x</item>
+    </string-array>
+    <string-array name="preference_anamorphic_desqueeze_values">
+        <item>preference_anamorphic_desqueeze_off</item>
+        <item>preference_anamorphic_desqueeze_1_33</item>
+        <item>preference_anamorphic_desqueeze_1_55</item>
+    </string-array>
 </resources>

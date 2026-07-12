@@ -1960,6 +1960,12 @@ public class MainActivity extends AppCompatActivity implements PreferenceFragmen
         this.mainUI.getOnScreenIcons().clickedPreviewShots();
     }
 
+    public void clickedAnamorphicDesqueeze(View view) {
+        if( MyDebug.LOG )
+            Log.d(TAG, "clickedAnamorphicDesqueeze");
+        this.mainUI.getOnScreenIcons().clickedAnamorphicDesqueeze();
+    }
+
     /* Returns the cameraId that the "Switch camera" button will switch to.
      * Note that this may not necessarily be the next camera ID, on multi camera devices (if
      * isMultiCamEnabled() returns true).
