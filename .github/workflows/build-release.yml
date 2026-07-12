@@ -25,13 +25,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Decode keystore
-        shell: bash
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Prepare keystore
         run: |
-          set -euo pipefail
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > app/release.jks
+          cp anacam.jks app/release.jks
           echo "Keystore size: $(wc -c < app/release.jks) bytes"
 
       - name: Export signing secrets
@@ -41,14 +37,12 @@ jobs:
           KS_ALIAS: ${{ secrets.KEY_ALIAS }}
           KS_KEY_PASS: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -s app/release.jks ]; then
-            echo "HAS_KEYSTORE=true" >> "$GITHUB_ENV"
-            {
-              printf 'KEYSTORE_PASSWORD<<DELIM\n%s\nDELIM\n' "$KS_PASS"
-              printf 'KEY_ALIAS<<DELIM\n%s\nDELIM\n' "$KS_ALIAS"
-              printf 'KEY_PASSWORD<<DELIM\n%s\nDELIM\n' "$KS_KEY_PASS"
-            } >> "$GITHUB_ENV"
-          fi
+          echo "HAS_KEYSTORE=true" >> "$GITHUB_ENV"
+          {
+            printf 'KEYSTORE_PASSWORD<<DELIM\n%s\nDELIM\n' "$KS_PASS"
+            printf 'KEY_ALIAS<<DELIM\n%s\nDELIM\n' "$KS_ALIAS"
+            printf 'KEY_PASSWORD<<DELIM\n%s\nDELIM\n' "$KS_KEY_PASS"
+          } >> "$GITHUB_ENV"
 
       - name: Verify keystore
         if: env.HAS_KEYSTORE == 'true'
