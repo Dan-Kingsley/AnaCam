@@ -961,6 +961,10 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             return;
         }
         double aspect_ratio = this.getAspectRatio();
+        float desqueeze = getAnamorphicDesqueezeFactor();
+        if( desqueeze != 1.0f ) {
+            aspect_ratio *= desqueeze;
+        }
 
         int previewWidth = MeasureSpec.getSize(widthSpec);
         int previewHeight = MeasureSpec.getSize(heightSpec);
@@ -1173,23 +1177,40 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
         RectF bufferRect = new RectF(0, 0, this.preview_h, this.preview_w);
         float centerX = viewRect.centerX();
         float centerY = viewRect.centerY();
+        float desqueeze = getAnamorphicDesqueezeFactor();
         if( rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270  ) {
-            bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
-            matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
-            float scale = Math.max(
-                    (float) textureview_h / preview_h,
-                    (float) textureview_w / preview_w);
-            matrix.postScale(scale, scale, centerX, centerY);
-            matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+            if( desqueeze != 1.0f ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
+                matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+                float scaleX = (float) textureview_w / preview_h;
+                float scaleY = (float) textureview_h / preview_w;
+                matrix.postScale(scaleX, scaleY, centerX, centerY);
+            }
+            else {
+                bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+                matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
+                float scale = Math.max(
+                        (float) textureview_h / preview_h,
+                        (float) textureview_w / preview_w);
+                matrix.postScale(scale, scale, centerX, centerY);
+                matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+            }
         }
         else if( rotation == Surface.ROTATION_180 ) {
             matrix.postRotate(180, centerX, centerY);
+            if( desqueeze != 1.0f ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "applying anamorphic desqueeze: " + desqueeze);
+                matrix.postScale(desqueeze, 1.0f, centerX, centerY);
+            }
         }
-        float desqueeze = getAnamorphicDesqueezeFactor();
-        if( desqueeze != 1.0f ) {
-            if( MyDebug.LOG )
-                Log.d(TAG, "applying anamorphic desqueeze: " + desqueeze);
-            matrix.postScale(desqueeze, 1.0f, centerX, centerY);
+        else {
+            if( desqueeze != 1.0f ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "applying anamorphic desqueeze: " + desqueeze);
+                matrix.postScale(desqueeze, 1.0f, centerX, centerY);
+            }
         }
         cameraSurface.setTransform(matrix);
     }
@@ -1207,6 +1228,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     public void updateAnamorphicDesqueeze() {
         if( MyDebug.LOG )
             Log.d(TAG, "updateAnamorphicDesqueeze");
+        cameraSurface.getView().requestLayout();
         configureTransform();
     }
 
