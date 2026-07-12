@@ -1,0 +1,103 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - AnaCam
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout AnaCam branch
+        uses: actions/checkout@v4
+        with:
+          ref: AnaCam
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Decode keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          echo "KEYSTORE_PATH=release.jks" >> $GITHUB_ENV
+          echo "Keystore decoded successfully"
+
+      - name: Build release APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java)))) ./gradlew assembleRelease
+
+      - name: Extract version from manifest
+        id: version
+        run: |
+          VERSION=$(grep 'android:versionName' app/src/main/AndroidManifest.xml | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected upstream version: $VERSION"
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          RUN_NUM=${{ github.run_number }}
+          TAG="v${VERSION}-anacam.${RUN_NUM}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG"
+
+      - name: Find APK file
+        id: apk
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "No release APK found, trying debug..."
+            APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          fi
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "APK: $APK_PATH"
+
+      - name: Create Git tag
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git tag -a ${{ steps.tag.outputs.tag }} -m "AnaCam ${{ steps.tag.outputs.tag }}"
+          git push origin ${{ steps.tag.outputs.tag }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "AnaCam ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## AnaCam ${{ steps.tag.outputs.tag }}
+
+            Based on OpenCamera ${{ steps.version.outputs.version }}
+
+            ### Anamorphic Desqueeze Feature
+            - Toggle icon on viewfinder for 1.33x desqueeze
+            - Configurable factor in Settings > Photo > Anamorphic desqueeze (Off / 1.33x / 1.55x)
+            - Applies to both viewfinder preview and saved images
+            - Setting persists across app restarts
+
+            ### Changes from upstream OpenCamera
+            - Anamorphic lens desqueeze support
+            - Auto-sync with upstream OpenCamera
+          files: ${{ steps.apk.outputs.apk_path }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
