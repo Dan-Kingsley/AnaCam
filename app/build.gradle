@@ -17,9 +17,8 @@ android {
 
     signingConfigs {
         release {
-            def ks = (System.getenv("KEYSTORE_BASE64") ?: "").trim()
-            if (ks) {
-                storeFile file(System.getenv("KEYSTORE_PATH") ?: "release.jks")
+            if (System.getenv("HAS_KEYSTORE") == "true") {
+                storeFile file("release.jks")
                 storePassword System.getenv("KEYSTORE_PASSWORD")
                 keyAlias System.getenv("KEY_ALIAS")
                 keyPassword System.getenv("KEY_PASSWORD")
@@ -31,8 +30,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
-            def ks = (System.getenv("KEYSTORE_BASE64") ?: "").trim()
-            if (ks) {
+            if (System.getenv("HAS_KEYSTORE") == "true") {
                 signingConfig signingConfigs.release
             }
         }
