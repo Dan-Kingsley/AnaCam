@@ -1202,8 +1202,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             if( desqueeze != 1.0f ) {
                 if( MyDebug.LOG )
                     Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
-                float scaleX = (float) textureview_w / preview_w;
-                float scaleY = (float) textureview_h / preview_h;
+                float scaleX = (float) textureview_w / preview_h;
+                float scaleY = (float) textureview_h / preview_w;
                 matrix.postScale(scaleX, scaleY, centerX, centerY);
             }
         }
@@ -1211,8 +1211,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             if( desqueeze != 1.0f ) {
                 if( MyDebug.LOG )
                     Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
-                float scaleX = (float) textureview_w / preview_w;
-                float scaleY = (float) textureview_h / preview_h;
+                float scaleX = (float) textureview_w / preview_h;
+                float scaleY = (float) textureview_h / preview_w;
                 matrix.postScale(scaleX, scaleY, centerX, centerY);
             }
         }
