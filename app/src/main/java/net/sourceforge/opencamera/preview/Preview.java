@@ -1184,7 +1184,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
                     Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
                 matrix.postRotate(90 * (rotation - 2), centerX, centerY);
                 float scaleX = (float) textureview_w / preview_h;
-                float scaleY = (float) textureview_h / preview_w;
+                float scaleY = (float) textureview_h / (preview_w * desqueeze);
                 matrix.postScale(scaleX, scaleY, centerX, centerY);
             }
             else {
@@ -1203,7 +1203,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
                 if( MyDebug.LOG )
                     Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
                 float scaleX = (float) textureview_w / preview_h;
-                float scaleY = (float) textureview_h / preview_w;
+                float scaleY = (float) textureview_h / (preview_w * desqueeze);
                 matrix.postScale(scaleX, scaleY, centerX, centerY);
             }
         }
@@ -1212,7 +1212,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
                 if( MyDebug.LOG )
                     Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
                 float scaleX = (float) textureview_w / preview_h;
-                float scaleY = (float) textureview_h / preview_w;
+                float scaleY = (float) textureview_h / (preview_w * desqueeze);
                 matrix.postScale(scaleX, scaleY, centerX, centerY);
             }
         }
@@ -1233,7 +1233,12 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
         if( MyDebug.LOG )
             Log.d(TAG, "updateAnamorphicDesqueeze");
         cameraSurface.getView().requestLayout();
-        configureTransform();
+        cameraSurface.getView().post(new Runnable() {
+            @Override
+            public void run() {
+                configureTransform();
+            }
+        });
     }
 
     public void stopVideo(boolean from_restart) {
