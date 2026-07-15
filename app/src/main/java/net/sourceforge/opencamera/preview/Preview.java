@@ -1201,15 +1201,19 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             matrix.postRotate(180, centerX, centerY);
             if( desqueeze != 1.0f ) {
                 if( MyDebug.LOG )
-                    Log.d(TAG, "applying anamorphic desqueeze: " + desqueeze);
-                matrix.postScale(desqueeze, 1.0f, centerX, centerY);
+                    Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
+                float scaleX = (float) textureview_w / preview_w;
+                float scaleY = (float) textureview_h / preview_h;
+                matrix.postScale(scaleX, scaleY, centerX, centerY);
             }
         }
         else {
             if( desqueeze != 1.0f ) {
                 if( MyDebug.LOG )
-                    Log.d(TAG, "applying anamorphic desqueeze: " + desqueeze);
-                matrix.postScale(desqueeze, 1.0f, centerX, centerY);
+                    Log.d(TAG, "applying anamorphic desqueeze with non-uniform scale: " + desqueeze);
+                float scaleX = (float) textureview_w / preview_w;
+                float scaleY = (float) textureview_h / preview_h;
+                matrix.postScale(scaleX, scaleY, centerX, centerY);
             }
         }
         cameraSurface.setTransform(matrix);
