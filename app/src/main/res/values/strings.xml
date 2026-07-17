@@ -965,6 +965,8 @@
     <string name="preference_individual_cam_favorites_summary">Select which lenses appear in the individual camera icons row. If none are selected, all lenses are shown.</string>
     <string name="preference_individual_cam_custom_names">Custom lens names</string>
     <string name="preference_individual_cam_custom_names_summary">Override auto-detected lens labels with custom names</string>
+    <string name="individual_cam_custom_name_for">Custom name for %s</string>
+    <string name="individual_cam_custom_name_hint">Enter custom label (leave empty for default)</string>
 
     <string name="preference_show_camera_id">Show camera ID</string>
     <string name="preference_show_camera_id_summary">Display the current camera ID number on screen</string>

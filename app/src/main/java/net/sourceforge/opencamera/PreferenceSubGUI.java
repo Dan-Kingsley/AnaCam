@@ -1,16 +1,18 @@
 package net.sourceforge.opencamera;
 
+import android.app.AlertDialog;
 import android.content.SharedPreferences;
+import android.content.DialogInterface;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
-import android.preference.EditTextPreference;
 import android.preference.ListPreference;
 import android.preference.MultiSelectListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceGroup;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.widget.EditText;
 
 import net.sourceforge.opencamera.cameracontroller.CameraControllerManager2;
 
@@ -25,6 +27,8 @@ import java.util.Set;
 
 public class PreferenceSubGUI extends PreferenceSubScreen {
     private static final String TAG = "PreferenceSubGUI";
+
+    private List<CameraControllerManager2.LensInfo> cachedLenses;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -140,17 +144,22 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
         final ListPreference multiCamModePref = (ListPreference) findPreference("preference_multi_cam_mode");
         final Preference displayFormatPref = findPreference("preference_individual_cam_display_format");
         final MultiSelectListPreference favoritesPref = (MultiSelectListPreference) findPreference("preference_individual_cam_favorites");
-        final EditTextPreference customNamesPref = (EditTextPreference) findPreference("preference_individual_cam_custom_names");
+        final Preference customNamesHeaderPref = findPreference("preference_individual_cam_custom_names_placeholder");
         final PreferenceGroup pg = (PreferenceGroup)this.findPreference("preferences_root");
 
         // Populate favorites entries from available lenses
         if( canShowMultiCam ) {
-            populateFavoritesEntries(favoritesPref);
+            cachedLenses = getAvailableLenses();
+            populateFavoritesEntries(favoritesPref, cachedLenses);
         }
 
         // Set initial visibility
         String currentMode = canShowMultiCam ? sharedPreferences.getString(PreferenceKeys.MultiCamModePreferenceKey, "menu") : "off";
-        setIndividualCamPreferencesVisible(pg, displayFormatPref, favoritesPref, customNamesPref, currentMode.equals("individual") && canShowMultiCam);
+        boolean showIndividual = currentMode.equals("individual") && canShowMultiCam;
+        setIndividualCamPreferencesVisible(pg, displayFormatPref, favoritesPref, customNamesHeaderPref, showIndividual);
+        if( showIndividual && cachedLenses != null ) {
+            populateCustomNameEntries(pg, cachedLenses);
+        }
 
         // Listen for mode changes to dynamically show/hide sub-preferences
         if( canShowMultiCam && multiCamModePref != null ) {
@@ -161,7 +170,12 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
                     boolean showIndividual = "individual".equals(newMode);
                     if( MyDebug.LOG )
                         Log.d(TAG, "multi-cam mode changed to: " + newMode);
-                    setIndividualCamPreferencesVisible(pg, displayFormatPref, favoritesPref, customNamesPref, showIndividual);
+                    setIndividualCamPreferencesVisible(pg, displayFormatPref, favoritesPref, customNamesHeaderPref, showIndividual);
+                    if( showIndividual && cachedLenses != null ) {
+                        populateCustomNameEntries(pg, cachedLenses);
+                    } else {
+                        removeCustomNameEntries(pg);
+                    }
                     return true;
                 }
             });
@@ -183,9 +197,9 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
             Log.d(TAG, "onCreate done");
     }
 
-    /** Show or hide the individual camera sub-preferences (display format, favorites, custom names). */
+    /** Show or hide the individual camera sub-preferences (display format, favorites, custom names header). */
     private void setIndividualCamPreferencesVisible(PreferenceGroup pg, Preference displayFormatPref,
-            MultiSelectListPreference favoritesPref, EditTextPreference customNamesPref, boolean visible) {
+            MultiSelectListPreference favoritesPref, Preference customNamesHeaderPref, boolean visible) {
         if( MyDebug.LOG )
             Log.d(TAG, "setIndividualCamPreferencesVisible: " + visible);
         if( visible ) {
@@ -193,38 +207,33 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
                 pg.addPreference(displayFormatPref);
             if( favoritesPref != null && pg.findPreference(PreferenceKeys.IndividualCamFavoritesKey) == null )
                 pg.addPreference(favoritesPref);
-            if( customNamesPref != null && pg.findPreference(PreferenceKeys.IndividualCamCustomNamesKey) == null )
-                pg.addPreference(customNamesPref);
+            if( customNamesHeaderPref != null && pg.findPreference("preference_individual_cam_custom_names_placeholder") == null )
+                pg.addPreference(customNamesHeaderPref);
         } else {
             if( displayFormatPref != null )
                 pg.removePreference(displayFormatPref);
             if( favoritesPref != null )
                 pg.removePreference(favoritesPref);
-            if( customNamesPref != null )
-                pg.removePreference(customNamesPref);
+            if( customNamesHeaderPref != null )
+                pg.removePreference(customNamesHeaderPref);
         }
     }
 
-    /** Populate the favorites MultiSelectListPreference with available lenses from the device. */
-    private void populateFavoritesEntries(MultiSelectListPreference favoritesPref) {
-        if( favoritesPref == null || getActivity() == null )
-            return;
+    /** Get available lenses from the device. */
+    private List<CameraControllerManager2.LensInfo> getAvailableLenses() {
+        if( getActivity() == null )
+            return new ArrayList<>();
         try {
             CameraManager manager = (CameraManager) getActivity().getSystemService(android.content.Context.CAMERA_SERVICE);
             if( manager == null )
-                return;
+                return new ArrayList<>();
             CameraControllerManager2 camManager2 = new CameraControllerManager2(getActivity());
             String[] cameraIdList = manager.getCameraIdList();
             if( cameraIdList == null || cameraIdList.length == 0 )
-                return;
+                return new ArrayList<>();
 
-            // Determine current facing to get same-facing cameras
-            // For simplicity, use camera 0's facing as the "current" facing
             int currentLogicalCameraId = 0;
-            android.hardware.camera2.CameraCharacteristics chars0 = manager.getCameraCharacteristics(cameraIdList[0]);
-            int facing0 = chars0.get(CameraCharacteristics.LENS_FACING);
 
-            // Get physical cameras if available
             Set<String> physicalCameraIds = null;
             try {
                 android.hardware.camera2.CameraCharacteristics logicalChars = manager.getCameraCharacteristics(cameraIdList[0]);
@@ -235,8 +244,19 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
                 // ignore
             }
 
-            List<CameraControllerManager2.LensInfo> lenses = camManager2.getAvailableLenses(getActivity(), currentLogicalCameraId, physicalCameraIds);
+            return camManager2.getAvailableLenses(getActivity(), currentLogicalCameraId, physicalCameraIds);
+        } catch(Throwable e) {
+            if( MyDebug.LOG )
+                Log.e(TAG, "Failed to get available lenses", e);
+            return new ArrayList<>();
+        }
+    }
 
+    /** Populate the favorites MultiSelectListPreference with available lenses from the device. */
+    private void populateFavoritesEntries(MultiSelectListPreference favoritesPref, List<CameraControllerManager2.LensInfo> lenses) {
+        if( favoritesPref == null || lenses == null || lenses.isEmpty() )
+            return;
+        try {
             List<String> entries = new ArrayList<>();
             List<String> values = new ArrayList<>();
 
@@ -268,8 +288,6 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
 
             // Set default: if no saved favorites, select all
             if( savedFavorites.isEmpty() ) {
-                // Set all as selected (empty set in MultiSelectListPreference means none selected, not all)
-                // We'll store an empty JSON array, which means "show all" in our logic
                 favoritesPref.setValues(new HashSet<String>());
             } else {
                 favoritesPref.setValues(savedFavorites);
@@ -281,6 +299,183 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
             if( MyDebug.LOG )
                 Log.e(TAG, "Failed to populate favorites entries", e);
         }
+    }
+
+    /** Remove all dynamically created custom name entries. */
+    private void removeCustomNameEntries(PreferenceGroup pg) {
+        List<Preference> toRemove = new ArrayList<>();
+        for (int i = 0; i < pg.getPreferenceCount(); i++) {
+            Preference pref = pg.getPreference(i);
+            String key = pref.getKey();
+            if( key != null && key.startsWith("preference_individual_cam_custom_name_") ) {
+                toRemove.add(pref);
+            }
+        }
+        for (Preference pref : toRemove) {
+            pg.removePreference(pref);
+        }
+    }
+
+    /** Create per-lens custom name preferences, one for each available lens. */
+    private void populateCustomNameEntries(PreferenceGroup pg, List<CameraControllerManager2.LensInfo> lenses) {
+        if( lenses == null || getActivity() == null )
+            return;
+
+        // Remove any existing custom name entries first
+        removeCustomNameEntries(pg);
+
+        // Load existing custom names
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        JSONObject existingNames = loadCustomNames(prefs);
+
+        for (CameraControllerManager2.LensInfo lens : lenses) {
+            final String cameraKey = lens.cameraKey;
+            String safeKey = "preference_individual_cam_custom_name_" + cameraKey.replaceAll("[^a-zA-Z0-9]", "_");
+
+            Preference pref = new Preference(getActivity());
+            pref.setKey(safeKey);
+            pref.setTitle(getString(R.string.individual_cam_custom_name_for, lens.defaultLabel));
+
+            // Get current custom name for this lens
+            String currentName = "";
+            try {
+                if( existingNames != null && existingNames.has(cameraKey) ) {
+                    currentName = existingNames.getString(cameraKey);
+                }
+            } catch(JSONException e) {
+                // ignore
+            }
+
+            if( !currentName.isEmpty() ) {
+                pref.setSummary(currentName);
+            } else {
+                pref.setSummary(R.string.individual_cam_custom_name_hint);
+            }
+
+            pref.setPersistent(false);
+
+            pref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    showCustomNameDialog(pg, lenses, cameraKey, lens.defaultLabel);
+                    return true;
+                }
+            });
+
+            pg.addPreference(pref);
+        }
+    }
+
+    /** Show a dialog to edit the custom name for a specific lens. */
+    private void showCustomNameDialog(final PreferenceGroup pg, final List<CameraControllerManager2.LensInfo> lenses,
+            final String cameraKey, String lensLabel) {
+        if( getActivity() == null )
+            return;
+
+        // Load current custom name
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        JSONObject existingNames = loadCustomNames(prefs);
+        String currentName = "";
+        try {
+            if( existingNames != null && existingNames.has(cameraKey) ) {
+                currentName = existingNames.getString(cameraKey);
+            }
+        } catch(JSONException e) {
+            // ignore
+        }
+
+        final EditText editText = new EditText(getActivity());
+        editText.setText(currentName);
+        editText.setHint(R.string.individual_cam_custom_name_hint);
+        editText.setSelectAllOnFocus(true);
+
+        new AlertDialog.Builder(getActivity())
+            .setTitle(getString(R.string.individual_cam_custom_name_for, lensLabel))
+            .setView(editText)
+            .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    String newName = editText.getText().toString().trim();
+                    saveCustomName(pg, lenses, cameraKey, newName);
+                }
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
+    /** Save a custom name for a lens and update the consolidated JSON in SharedPreferences. */
+    private void saveCustomName(PreferenceGroup pg, List<CameraControllerManager2.LensInfo> lenses,
+            String cameraKey, String newName) {
+        if( getActivity() == null )
+            return;
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        JSONObject existingNames = loadCustomNames(prefs);
+
+        if( existingNames == null )
+            existingNames = new JSONObject();
+
+        try {
+            if( newName.isEmpty() ) {
+                existingNames.remove(cameraKey);
+            } else {
+                existingNames.put(cameraKey, newName);
+            }
+        } catch(JSONException e) {
+            if( MyDebug.LOG )
+                Log.e(TAG, "Failed to save custom name", e);
+            return;
+        }
+
+        // Write back to SharedPreferences
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString(PreferenceKeys.IndividualCamCustomNamesKey, existingNames.toString());
+        editor.apply();
+
+        // Update summaries of the per-lens preferences
+        for (int i = 0; i < pg.getPreferenceCount(); i++) {
+            Preference pref = pg.getPreference(i);
+            String key = pref.getKey();
+            if( key != null && key.startsWith("preference_individual_cam_custom_name_") ) {
+                // Find the lens this preference corresponds to
+                for (CameraControllerManager2.LensInfo lens : lenses) {
+                    String safeKey = "preference_individual_cam_custom_name_" + lens.cameraKey.replaceAll("[^a-zA-Z0-9]", "_");
+                    if( key.equals(safeKey) ) {
+                        String name = "";
+                        try {
+                            if( existingNames.has(lens.cameraKey) ) {
+                                name = existingNames.getString(lens.cameraKey);
+                            }
+                        } catch(JSONException e) {
+                            // ignore
+                        }
+                        if( !name.isEmpty() ) {
+                            pref.setSummary(name);
+                        } else {
+                            pref.setSummary(R.string.individual_cam_custom_name_hint);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        if( MyDebug.LOG )
+            Log.d(TAG, "saveCustomName: " + cameraKey + " -> " + newName);
+    }
+
+    /** Load custom names from SharedPreferences as a JSONObject. */
+    private JSONObject loadCustomNames(SharedPreferences prefs) {
+        String json = prefs.getString(PreferenceKeys.IndividualCamCustomNamesKey, null);
+        if( json != null && !json.isEmpty() ) {
+            try {
+                return new JSONObject(json);
+            } catch(JSONException e) {
+                if( MyDebug.LOG )
+                    Log.e(TAG, "Failed to parse custom names JSON", e);
+            }
+        }
+        return null;
     }
 
     /** Update the favorites summary to show the number of selected lenses. */

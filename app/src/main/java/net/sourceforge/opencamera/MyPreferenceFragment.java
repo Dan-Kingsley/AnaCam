@@ -27,6 +27,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.EditTextPreference;
 import android.preference.ListPreference;
+import android.preference.MultiSelectListPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.Preference.OnPreferenceClickListener;
@@ -1033,7 +1034,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
             TwoStatePreference twoStatePref = (TwoStatePreference)pref;
             twoStatePref.setChecked(prefs.getBoolean(key, true));
         }
-        else if( pref instanceof  ListPreference ) {
+        else if( pref instanceof  ListPreference && !(pref instanceof MultiSelectListPreference) ) {
             ListPreference listPref = (ListPreference)pref;
             listPref.setValue(prefs.getString(key, ""));
         }

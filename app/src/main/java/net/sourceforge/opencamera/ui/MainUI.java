@@ -653,10 +653,12 @@ public class MainUI {
             view = main_activity.findViewById(R.id.individual_cam_container);
             layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();
             layoutParams.addRule(align_parent_left, 0);
-            layoutParams.addRule(align_parent_right, RelativeLayout.TRUE);
+            layoutParams.addRule(align_parent_right, 0);
             layoutParams.addRule(align_parent_top, 0);
             layoutParams.addRule(align_parent_bottom, 0);
-            layoutParams.addRule(ui_independent_above, R.id.take_photo);
+            layoutParams.addRule(center_vertical, RelativeLayout.TRUE);
+            layoutParams.addRule(center_horizontal, 0);
+            layoutParams.addRule(left_of, R.id.take_photo);
             layoutParams.addRule(ui_independent_below, 0);
             layoutParams.addRule(ui_independent_left_of, 0);
             layoutParams.addRule(ui_independent_right_of, 0);

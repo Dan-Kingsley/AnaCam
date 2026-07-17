@@ -191,11 +191,12 @@
         android:defaultValue="@array/empty_array"
         />
 
-    <EditTextPreference
-        android:key="preference_individual_cam_custom_names"
+    <!-- Custom lens names are created dynamically per-lens in PreferenceSubGUI.java -->
+    <Preference
+        android:key="preference_individual_cam_custom_names_placeholder"
         android:title="@string/preference_individual_cam_custom_names"
         android:summary="@string/preference_individual_cam_custom_names_summary"
-        android:defaultValue=""
+        android:persistent="false"
         />
 
     <SwitchPreference
