@@ -3743,7 +3743,14 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         // (It wouldn't be a huge problem if we did start from _1, but it would be inconsistent with the naming
         // of images where images.size() > 1 (e.g., expo bracketing mode) where we also start from _0.)
         int suffix_offset = force_suffix ? (n_capture_images_raw-1) : 0;
-        boolean success = imageSaver.saveImageRaw(do_in_background, force_suffix, suffix_offset, raw_image, current_date);
+        float anamorphic_desqueeze_factor = 1.0f;
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+        String anamorphic_pref = sharedPreferences.getString(PreferenceKeys.AnamorphicDesqueezePreferenceKey, "preference_anamorphic_desqueeze_off");
+        switch( anamorphic_pref ) {
+            case "preference_anamorphic_desqueeze_1_33": anamorphic_desqueeze_factor = 1.33f; break;
+            case "preference_anamorphic_desqueeze_1_55": anamorphic_desqueeze_factor = 1.55f; break;
+        }
+        boolean success = imageSaver.saveImageRaw(do_in_background, force_suffix, suffix_offset, raw_image, current_date, anamorphic_desqueeze_factor);
 
         if( MyDebug.LOG )
             Log.d(TAG, "onRawPictureTaken complete");
@@ -3758,10 +3765,18 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 
         boolean do_in_background = saveInBackground(false);
 
+        float anamorphic_desqueeze_factor = 1.0f;
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+        String anamorphic_pref = sharedPreferences.getString(PreferenceKeys.AnamorphicDesqueezePreferenceKey, "preference_anamorphic_desqueeze_off");
+        switch( anamorphic_pref ) {
+            case "preference_anamorphic_desqueeze_1_33": anamorphic_desqueeze_factor = 1.33f; break;
+            case "preference_anamorphic_desqueeze_1_55": anamorphic_desqueeze_factor = 1.55f; break;
+        }
+
         // currently we don't ever do post processing with RAW burst images, so just save them all
         boolean success = true;
         for(int i=0;i<raw_images.size() && success;i++) {
-            success = imageSaver.saveImageRaw(do_in_background, true, i, raw_images.get(i), current_date);
+            success = imageSaver.saveImageRaw(do_in_background, true, i, raw_images.get(i), current_date, anamorphic_desqueeze_factor);
         }
 
         if( MyDebug.LOG )

@@ -697,7 +697,8 @@ public class ImageSaver extends Thread {
                          boolean force_suffix,
                          int suffix_offset,
                          RawImage raw_image,
-                         Date current_date) {
+                         Date current_date,
+                         float anamorphic_desqueeze_factor) {
         if( MyDebug.LOG ) {
             Log.d(TAG, "saveImageRaw");
             Log.d(TAG, "do_in_background? " + do_in_background);
@@ -730,7 +731,7 @@ public class ImageSaver extends Thread {
                 0.0, false,
                 null, null,
                 1,
-                1.0f);
+                anamorphic_desqueeze_factor);
     }
 
     private Request pending_image_average_request = null;
@@ -2463,6 +2464,38 @@ public class ImageSaver extends Thread {
             output.close();
             output = null;
             success = true;
+
+            if( success && request.anamorphic_desqueeze_factor != 1.0f ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "applying anamorphic desqueeze to RAW: " + request.anamorphic_desqueeze_factor);
+                try {
+                    if( picFile != null ) {
+                        DngTagEditor.applyDesqueeze(picFile, request.anamorphic_desqueeze_factor);
+                    }
+                    else if( saveUri != null ) {
+                        java.io.InputStream inputStream = main_activity.getContentResolver().openInputStream(saveUri);
+                        if( inputStream != null ) {
+                            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                            byte[] buffer = new byte[8192];
+                            int bytesRead;
+                            while( (bytesRead = inputStream.read(buffer)) != -1 ) {
+                                baos.write(buffer, 0, bytesRead);
+                            }
+                            inputStream.close();
+                            byte[] dngData = DngTagEditor.applyDesqueezeToBytes(baos.toByteArray(), request.anamorphic_desqueeze_factor);
+                            java.io.OutputStream uriOutput = main_activity.getContentResolver().openOutputStream(saveUri);
+                            if( uriOutput != null ) {
+                                uriOutput.write(dngData);
+                                uriOutput.close();
+                            }
+                        }
+                    }
+                }
+                catch(IOException e) {
+                    MyDebug.logStackTrace(TAG, "failed to apply desqueeze to RAW DNG", e);
+                    // don't fail the save, just log the error - the unsqueezed DNG is still valid
+                }
+            }
 
             // set last image for share/trash options for pause preview
             // Must be done before broadcastFile() (because on Android 7+ with non-SAF, we update
