@@ -102,9 +102,12 @@ public class MultiCamHandler {
         return sharedPreferences.getString(PreferenceKeys.MultiCamModePreferenceKey, "menu");
     }
 
-    /** Whether the individual camera icons mode is active (not off, not menu, but individual). */
+    /** Whether the individual camera icons mode is active (not off, not menu, but individual).
+     *  This only checks the user preference — capability checks (hasPhysicalCameras, hasMultiCameras)
+     *  are done separately in showIndividualCamIcons().
+     */
     boolean isIndividualCamMode(Context context) {
-        return isMultiCamEnabled(context) && getMultiCamMode(context).equals("individual");
+        return getMultiCamMode(context).equals("individual");
     }
 
     /** Whether the menu mode is active (existing dialog behavior). */

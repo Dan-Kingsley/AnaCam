@@ -1088,4 +1088,10 @@
         <item>multiplier</item>
         <item>mm</item>
     </string-array>
+    <string-array name="empty_array">
+    </string-array>
+    <string-array name="individual_cam_favorites_entries">
+    </string-array>
+    <string-array name="individual_cam_favorites_values">
+    </string-array>
 </resources>

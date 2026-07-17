@@ -182,6 +182,22 @@
         android:defaultValue="multiplier"
         />
 
+    <MultiSelectListPreference
+        android:key="preference_individual_cam_favorites"
+        android:title="@string/preference_individual_cam_favorites"
+        android:summary="@string/preference_individual_cam_favorites_summary"
+        android:entries="@array/individual_cam_favorites_entries"
+        android:entryValues="@array/individual_cam_favorites_values"
+        android:defaultValue="@array/empty_array"
+        />
+
+    <EditTextPreference
+        android:key="preference_individual_cam_custom_names"
+        android:title="@string/preference_individual_cam_custom_names"
+        android:summary="@string/preference_individual_cam_custom_names_summary"
+        android:defaultValue=""
+        />
+
     <SwitchPreference
         android:key="preference_keep_display_on"
         android:title="@string/preference_keep_display_on"
