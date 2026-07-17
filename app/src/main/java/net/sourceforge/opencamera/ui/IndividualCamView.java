@@ -75,7 +75,7 @@ public class IndividualCamView {
             btn.setTypeface(null, Typeface.BOLD);
             btn.setTextColor(Color.WHITE);
 
-            String label = getLensLabel(lens, displayFormat, customNames, mainEquivFocal);
+            String label = getLensLabel(lens, displayFormat, customNames, mainEquivFocal, currentLogicalCameraId);
             btn.setText(label);
 
             // Background: circular with icons_background_tint
@@ -138,7 +138,7 @@ public class IndividualCamView {
     }
 
     /** Compute the display label for a lens based on the current format and custom names. */
-    private String getLensLabel(LensInfo lens, String displayFormat, JSONObject customNames, float mainEquivFocal) {
+    private String getLensLabel(LensInfo lens, String displayFormat, JSONObject customNames, float mainEquivFocal, int currentLogicalCameraId) {
         // Check for custom name first
         try {
             if (customNames != null && customNames.has(lens.cameraKey)) {
@@ -149,6 +149,11 @@ public class IndividualCamView {
             }
         } catch (JSONException e) {
             // ignore
+        }
+
+        // Auto lens (current logical camera, not physical) is labeled "A"
+        if (lens.logicalCameraId == currentLogicalCameraId && !lens.isPhysical) {
+            return "A";
         }
 
         // Compute label from auto-detected data

@@ -413,6 +413,16 @@ public class CameraControllerManager2 extends CameraControllerManager {
             }
         });
 
+        // Move auto lens (current logical camera, not physical) to front of list
+        for (int i = 0; i < lenses.size(); i++) {
+            LensInfo lens = lenses.get(i);
+            if (lens.logicalCameraId == currentLogicalCameraId && !lens.isPhysical) {
+                lenses.remove(i);
+                lenses.add(0, lens);
+                break;
+            }
+        }
+
         return lenses;
     }
 
