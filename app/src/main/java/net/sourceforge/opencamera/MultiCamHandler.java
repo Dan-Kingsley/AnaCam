@@ -81,10 +81,35 @@ public class MultiCamHandler {
     }
 
     /** Whether this is a multi camera device, and the user preference is set to enable the multi-camera button.
+     *  Supports migration from old boolean preference to new 3-option preference.
      */
     boolean isMultiCamEnabled(Context context) {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
-        return is_multi_cam && sharedPreferences.getBoolean(PreferenceKeys.MultiCamButtonPreferenceKey, true);
+        String mode = getMultiCamMode(context);
+        return is_multi_cam && !mode.equals("off");
+    }
+
+    /** Get the current multi-camera mode string: "off", "menu", or "individual".
+     *  Handles migration from old boolean preference.
+     */
+    String getMultiCamMode(Context context) {
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+        if (!sharedPreferences.contains(PreferenceKeys.MultiCamModePreferenceKey)) {
+            // Migration: convert old boolean to new mode
+            boolean oldEnabled = sharedPreferences.getBoolean(PreferenceKeys.MultiCamButtonPreferenceKey, true);
+            return oldEnabled ? "menu" : "off";
+        }
+        return sharedPreferences.getString(PreferenceKeys.MultiCamModePreferenceKey, "menu");
+    }
+
+    /** Whether the individual camera icons mode is active (not off, not menu, but individual). */
+    boolean isIndividualCamMode(Context context) {
+        return isMultiCamEnabled(context) && getMultiCamMode(context).equals("individual");
+    }
+
+    /** Whether the menu mode is active (existing dialog behavior). */
+    boolean isMenuCamMode(Context context) {
+        return isMultiCamEnabled(context) && getMultiCamMode(context).equals("menu");
     }
 
     /** Whether this is a multi camera device, whether or not the user preference is set to enable

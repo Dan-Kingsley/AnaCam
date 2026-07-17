@@ -218,6 +218,10 @@ public class PreferenceKeys {
     public static final String StartupFocusPreferenceKey = "preference_startup_focus";
 
     public static final String MultiCamButtonPreferenceKey = "preference_multi_cam_button";
+    public static final String MultiCamModePreferenceKey = "preference_multi_cam_mode";
+    public static final String IndividualCamDisplayFormatKey = "preference_individual_cam_display_format";
+    public static final String IndividualCamFavoritesKey = "preference_individual_cam_favorites";
+    public static final String IndividualCamCustomNamesKey = "preference_individual_cam_custom_names";
 
     public static final String KeepDisplayOnPreferenceKey = "preference_keep_display_on";
 

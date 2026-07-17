@@ -693,34 +693,28 @@ public class MainActivity extends AppCompatActivity implements PreferenceFragmen
         return multiCamHandler.isMultiCam();
     }
 
-    /* Returns the camera Id in use by the preview - or the one we requested, if the camera failed
+    /** Returns the camera Id in use by the preview - or the one we requested, if the camera failed
      * to open.
      * Needed as Preview.getCameraId() returns 0 if camera_controller==null, but if the camera
      * fails to open, we want the switch camera icons to still work as expected!
      */
-    private int getActualCameraId() {
+    public int getActualCameraId() {
         if( preview.getCameraController() == null )
             return applicationInterface.getCameraIdPref();
         else
             return preview.getCameraId();
     }
 
-    /** Whether the icon switch_multi_camera should be displayed. This is if the following are all
-     *  true:
-     *  - The device is a multi camera device (MainActivity.is_multi_cam==true).
-     *  - The user preference for using the separate icons is enabled
-     *    (PreferenceKeys.MultiCamButtonPreferenceKey).
-     *  - For the current camera ID, there are at least two cameras with the same front/back/external
-     *    "facing" (e.g., imagine a device with two back cameras, but only one front camera - no point
-     *    showing the multi-cam icon for just a single logical front camera).
-     *  OR there are physical cameras for the current camera, and again the user preference
-     *  PreferenceKeys.MultiCamButtonPreferenceKey is enabled.
+    /** Whether the icon switch_multi_camera should be displayed (for menu mode only).
+     *  In individual mode, this returns false because individual icons replace the menu button.
      */
     public boolean showSwitchMultiCamIcon() {
+        // In individual mode, don't show the menu button
+        if( multiCamHandler.isIndividualCamMode(this) )
+            return false;
         if( preview.hasPhysicalCameras() ) {
-            SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-            if( sharedPreferences.getBoolean(PreferenceKeys.MultiCamButtonPreferenceKey, true) )
-                return true;
+            String mode = multiCamHandler.getMultiCamMode(this);
+            return !mode.equals("off");
         }
         if( isMultiCamEnabled() ) {
             int cameraId = getActualCameraId();
@@ -729,6 +723,40 @@ public class MainActivity extends AppCompatActivity implements PreferenceFragmen
             }
         }
         return false;
+    }
+
+    /** Whether the individual camera icons row should be displayed. */
+    public boolean showIndividualCamIcons() {
+        if( !multiCamHandler.isIndividualCamMode(this) )
+            return false;
+        if( preview.hasPhysicalCameras() )
+            return true;
+        if( isMultiCamEnabled() ) {
+            int cameraId = getActualCameraId();
+            return this.multiCamHandler.hasMultiCameras(preview.getCameraControllerManager().getFacing(cameraId));
+        }
+        return false;
+    }
+
+    /** Get the current multi-camera mode string. */
+    public String getMultiCamMode() {
+        return multiCamHandler.getMultiCamMode(this);
+    }
+
+    /** Called when an individual lens icon is clicked. */
+    public void onIndividualLensClicked(int logicalCameraId, String physicalCameraId) {
+        if( MyDebug.LOG )
+            Log.d(TAG, "onIndividualLensClicked: " + logicalCameraId + " / " + physicalCameraId);
+        if( preview.isOpeningCamera() ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "already opening camera in background thread");
+            return;
+        }
+        this.closePopup();
+        if( preview.canSwitchCamera() ) {
+            pushCameraIdToast(logicalCameraId, physicalCameraId);
+            userSwitchToCamera(logicalCameraId, physicalCameraId);
+        }
     }
 
     /** Whether user preference is set to allow long press actions.

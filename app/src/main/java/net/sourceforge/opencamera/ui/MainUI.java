@@ -2,6 +2,7 @@ package net.sourceforge.opencamera.ui;
 
 import net.sourceforge.opencamera.MyApplicationInterface;
 import net.sourceforge.opencamera.cameracontroller.CameraController;
+import net.sourceforge.opencamera.cameracontroller.CameraControllerManager2;
 import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyDebug;
 import net.sourceforge.opencamera.PreferenceKeys;
@@ -54,6 +55,8 @@ public class MainUI {
     private final MainActivity main_activity;
 
     private final OnScreenIcons onScreenIcons;
+
+    private final IndividualCamView individualCamView;
 
     private volatile boolean popup_view_is_open; // must be volatile for test project reading the state
     private PopupView popup_view;
@@ -110,12 +113,18 @@ public class MainUI {
         this.main_activity = main_activity;
 
         this.onScreenIcons = new OnScreenIcons(main_activity);
+        this.individualCamView = new IndividualCamView(main_activity);
 
         this.setSeekbarColors();
     }
 
     public OnScreenIcons getOnScreenIcons() {
         return this.onScreenIcons;
+    }
+
+    /** Get the IndividualCamView for updating lens buttons. */
+    public IndividualCamView getIndividualCamView() {
+        return this.individualCamView;
     }
 
     private void setSeekbarColors() {
@@ -638,6 +647,20 @@ public class MainUI {
                 int margin = (int) (5 * scale + 0.5f); // convert dps to pixels
                 setMarginsForSystemUI(layoutParams, 0, 0, margin, 0);
             }
+            view.setLayoutParams(layoutParams);
+            setViewRotation(view, ui_rotation);
+
+            view = main_activity.findViewById(R.id.individual_cam_container);
+            layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();
+            layoutParams.addRule(align_parent_left, 0);
+            layoutParams.addRule(align_parent_right, RelativeLayout.TRUE);
+            layoutParams.addRule(align_parent_top, 0);
+            layoutParams.addRule(align_parent_bottom, 0);
+            layoutParams.addRule(ui_independent_above, R.id.take_photo);
+            layoutParams.addRule(ui_independent_below, 0);
+            layoutParams.addRule(ui_independent_left_of, 0);
+            layoutParams.addRule(ui_independent_right_of, 0);
+            setMarginsForSystemUI(layoutParams, 0, 0, navigation_gap, 0);
             view.setLayoutParams(layoutParams);
             setViewRotation(view, ui_rotation);
 
@@ -1253,6 +1276,16 @@ public class MainUI {
                     switchCameraButton.setVisibility(visibility);
                 if( main_activity.showSwitchMultiCamIcon() )
                     switchMultiCameraButton.setVisibility(visibility);
+                {
+                    View individualCamContainer = main_activity.findViewById(R.id.individual_cam_container);
+                    if( main_activity.showIndividualCamIcons() ) {
+                        individualCamContainer.setVisibility(visibility);
+                        if( visibility == View.VISIBLE )
+                            updateIndividualCamView();
+                    } else {
+                        individualCamContainer.setVisibility(View.GONE);
+                    }
+                }
                 switchVideoButton.setVisibility(visibility);
                 if( main_activity.supportsExposureButton() )
                     exposureButton.setVisibility(visibility);
@@ -1341,6 +1374,16 @@ public class MainUI {
                     switchCameraButton.setVisibility(visibility);
                 if( main_activity.showSwitchMultiCamIcon() )
                     switchMultiCameraButton.setVisibility(visibility);
+                {
+                    View individualCamContainer = main_activity.findViewById(R.id.individual_cam_container);
+                    if( main_activity.showIndividualCamIcons() ) {
+                        individualCamContainer.setVisibility(visibility);
+                        if( visibility == View.VISIBLE )
+                            updateIndividualCamView();
+                    } else {
+                        individualCamContainer.setVisibility(View.GONE);
+                    }
+                }
                 switchVideoButton.setVisibility(visibility);
                 if( main_activity.supportsExposureButton() )
                     exposureButton.setVisibility(visibility_video); // still allow exposure when recording video
@@ -1366,6 +1409,34 @@ public class MainUI {
                 }
             }
         });
+    }
+
+    /** Update the individual camera lens icons (populate or refresh the button row). */
+    private void updateIndividualCamView() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "updateIndividualCamView");
+        if( main_activity.getPreview() == null || main_activity.getPreview().getCameraControllerManager() == null )
+            return;
+        if( !(main_activity.getPreview().getCameraControllerManager() instanceof CameraControllerManager2) )
+            return; // individual icons only supported with Camera2 API
+        CameraControllerManager2 cameraManager2 = (CameraControllerManager2) main_activity.getPreview().getCameraControllerManager();
+        int currentLogicalCameraId = main_activity.getActualCameraId();
+        java.util.Set<String> physicalCameraIds = main_activity.getPreview().getPhysicalCameras();
+        individualCamView.updateLenses(cameraManager2, currentLogicalCameraId, physicalCameraIds);
+        // Set active lens highlight
+        String currentPhysicalId = main_activity.getApplicationInterface().getCameraIdSPhysicalPref();
+        String activeKey = CameraControllerManager2.LensInfo.makeKey(currentLogicalCameraId, currentPhysicalId);
+        individualCamView.setActiveLens(activeKey);
+    }
+
+    /** Update the active lens highlight without rebuilding the entire row. */
+    public void updateActiveLens() {
+        if( !main_activity.showIndividualCamIcons() )
+            return;
+        int currentLogicalCameraId = main_activity.getActualCameraId();
+        String currentPhysicalId = main_activity.getApplicationInterface().getCameraIdSPhysicalPref();
+        String activeKey = CameraControllerManager2.LensInfo.makeKey(currentLogicalCameraId, currentPhysicalId);
+        individualCamView.setActiveLens(activeKey);
     }
 
     public void audioControlStarted() {

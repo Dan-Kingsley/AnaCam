@@ -1070,4 +1070,22 @@
         <item>preference_anamorphic_desqueeze_1_33</item>
         <item>preference_anamorphic_desqueeze_1_55</item>
     </string-array>
+    <string-array name="preference_multi_cam_mode_entries">
+        <item>@string/multi_cam_mode_off</item>
+        <item>@string/multi_cam_mode_menu</item>
+        <item>@string/multi_cam_mode_individual</item>
+    </string-array>
+    <string-array name="preference_multi_cam_mode_values">
+        <item>off</item>
+        <item>menu</item>
+        <item>individual</item>
+    </string-array>
+    <string-array name="individual_cam_display_format_entries">
+        <item>@string/display_format_multiplier</item>
+        <item>@string/display_format_mm</item>
+    </string-array>
+    <string-array name="individual_cam_display_format_values">
+        <item>multiplier</item>
+        <item>mm</item>
+    </string-array>
 </resources>

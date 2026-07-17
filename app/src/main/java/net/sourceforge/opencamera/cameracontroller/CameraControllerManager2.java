@@ -11,6 +11,12 @@ import android.hardware.camera2.CameraMetadata;
 import android.util.Log;
 import android.util.SizeF;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+
 /** Provides support using Android 5's Camera 2 API
  *  android.hardware.camera2.*.
  */
@@ -242,5 +248,183 @@ public class CameraControllerManager2 extends CameraControllerManager {
             MyDebug.logStackTrace(TAG, "exception trying to get camera characteristics", e);
         }
         return false;
+    }
+
+    /** Holds metadata about a camera lens for individual camera icons. */
+    public static class LensInfo {
+        public int logicalCameraId;
+        public String physicalCameraId; // null for logical cameras
+        public String cameraKey;       // "0" or "0_0" format
+        public float focalLengthMm;    // actual focal length in mm
+        public float equivFocalLengthMm; // 35mm-equivalent focal length
+        public float viewAngleX;       // horizontal view angle in degrees
+        public String defaultLabel;    // auto-detected label
+        public boolean isPhysical;     // true if this is a physical sub-camera
+
+        /** Generate a stable key for this camera entry. */
+        public static String makeKey(int logicalCameraId, String physicalCameraId) {
+            if (physicalCameraId != null)
+                return logicalCameraId + "_" + physicalCameraId;
+            else
+                return String.valueOf(logicalCameraId);
+        }
+    }
+
+    /** Computes focal length and 35mm-equivalent focal length for a camera (logical or physical).
+     *  @return float[2] where [0] = actual focal length in mm, [1] = 35mm-equivalent. Returns null if unavailable.
+     */
+    public float[] getFocalLengthInfo(String cameraIdS) {
+        CameraManager manager = (CameraManager)context.getSystemService(Context.CAMERA_SERVICE);
+        try {
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraIdS);
+            float[] focal_lengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
+            SizeF physical_size = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE);
+            if (focal_lengths == null || focal_lengths.length == 0 || physical_size == null)
+                return null;
+            float focalLengthMm = focal_lengths[0];
+            float sensorWidthMm = physical_size.getWidth();
+            float equivFocalLengthMm = (float)(focalLengthMm * (36.0 / sensorWidthMm));
+            return new float[]{focalLengthMm, equivFocalLengthMm};
+        }
+        catch (Throwable e) {
+            MyDebug.logStackTrace(TAG, "exception getting focal length info", e);
+        }
+        return null;
+    }
+
+    /** Get all available lenses (logical + physical) for the given facing, with metadata.
+     *  Results are sorted by focal length (widest first).
+     */
+    public List<LensInfo> getAvailableLenses(Context context, int currentLogicalCameraId, Set<String> physicalCameraIds) {
+        List<LensInfo> lenses = new ArrayList<>();
+        CameraManager manager = (CameraManager)context.getSystemService(Context.CAMERA_SERVICE);
+
+        try {
+            String[] cameraIdList = manager.getCameraIdList();
+            CameraController.Facing currentFacing = getFacing(currentLogicalCameraId);
+
+            // Collect logical cameras with same facing
+            List<Integer> sameFacingLogicalIds = new ArrayList<>();
+            for (int i = 0; i < cameraIdList.length; i++) {
+                if (getFacing(i) == currentFacing) {
+                    sameFacingLogicalIds.add(i);
+                }
+            }
+
+            for (int logicalId : sameFacingLogicalIds) {
+                String logicalIdS = cameraIdList[logicalId];
+                float[] focalInfo = getFocalLengthInfo(logicalIdS);
+                CameraControllerManager.CameraInfo info = new CameraControllerManager.CameraInfo();
+                String desc = getDescription(info, context, logicalIdS, true, false);
+
+                // Compute view angle for this logical camera
+                try {
+                    CameraCharacteristics chars = manager.getCameraCharacteristics(logicalIdS);
+                    SizeF viewAngle = computeViewAngles(chars);
+                    info.view_angle = viewAngle;
+                } catch (Throwable e) {
+                    // ignore
+                }
+
+                LensInfo lensInfo = new LensInfo();
+                lensInfo.logicalCameraId = logicalId;
+                lensInfo.physicalCameraId = null;
+                lensInfo.cameraKey = LensInfo.makeKey(logicalId, null);
+                lensInfo.isPhysical = false;
+                lensInfo.viewAngleX = (info.view_angle != null) ? info.view_angle.getWidth() : 55.0f;
+
+                if (focalInfo != null) {
+                    lensInfo.focalLengthMm = focalInfo[0];
+                    lensInfo.equivFocalLengthMm = focalInfo[1];
+                }
+
+                // Build default label: "logicalId: description"
+                lensInfo.defaultLabel = logicalId + ": " + desc;
+
+                // Add physical cameras for the current logical camera
+                if (logicalId == currentLogicalCameraId && physicalCameraIds != null) {
+                    // First add the logical camera itself (as "Auto Lens")
+                    lensInfo.defaultLabel = logicalId + ": " + desc + " (Auto Lens)";
+                    lenses.add(lensInfo);
+
+                    // Sort physical cameras by view angle (widest first)
+                    List<LensInfo> physicalLenses = new ArrayList<>();
+                    int j = 0;
+                    for (String physicalId : physicalCameraIds) {
+                        String physicalIdS = physicalId;
+                        float[] physFocalInfo = getFocalLengthInfo(physicalIdS);
+                        CameraControllerManager.CameraInfo physInfo = new CameraControllerManager.CameraInfo();
+                        String physDesc = getDescription(physInfo, context, physicalIdS, false, true);
+
+                        try {
+                            CameraCharacteristics physChars = manager.getCameraCharacteristics(physicalIdS);
+                            SizeF physViewAngle = computeViewAngles(physChars);
+                            physInfo.view_angle = physViewAngle;
+                        } catch (Throwable e) {
+                            // ignore
+                        }
+
+                        LensInfo physLens = new LensInfo();
+                        physLens.logicalCameraId = logicalId;
+                        physLens.physicalCameraId = physicalId;
+                        physLens.cameraKey = LensInfo.makeKey(logicalId, physicalId);
+                        physLens.isPhysical = true;
+                        physLens.viewAngleX = (physInfo.view_angle != null) ? physInfo.view_angle.getWidth() : 55.0f;
+
+                        if (physFocalInfo != null) {
+                            physLens.focalLengthMm = physFocalInfo[0];
+                            physLens.equivFocalLengthMm = physFocalInfo[1];
+                        }
+
+                        physLens.defaultLabel = "Lens " + j + ": " + physDesc;
+                        physicalLenses.add(physLens);
+                        j++;
+                    }
+
+                    // Sort physical lenses by view angle descending (widest first)
+                    Collections.sort(physicalLenses, new Comparator<LensInfo>() {
+                        @Override
+                        public int compare(LensInfo o1, LensInfo o2) {
+                            float diff = o2.viewAngleX - o1.viewAngleX;
+                            if (Math.abs(diff) < 1.0e-5f) return 0;
+                            return diff > 0.0f ? 1 : -1;
+                        }
+                    });
+
+                    lenses.addAll(physicalLenses);
+                } else if (logicalId != currentLogicalCameraId) {
+                    lenses.add(lensInfo);
+                }
+            }
+        }
+        catch (Throwable e) {
+            MyDebug.logStackTrace(TAG, "exception getting available lenses", e);
+        }
+
+        // Sort all lenses by equiv focal length (widest first)
+        Collections.sort(lenses, new Comparator<LensInfo>() {
+            @Override
+            public int compare(LensInfo o1, LensInfo o2) {
+                // Physical cameras under the current logical camera should stay in their sub-group order
+                // So only sort at the top level (logical cameras and their physical sub-cameras)
+                float diff = o1.equivFocalLengthMm - o2.equivFocalLengthMm;
+                if (Math.abs(diff) < 0.1f) return 0;
+                return diff > 0.0f ? 1 : -1;
+            }
+        });
+
+        return lenses;
+    }
+
+    /** Compute the 1x multiplier reference focal length (the "main" camera = widest lens). */
+    public float getMainCameraEquivFocalLength(List<LensInfo> lenses) {
+        float minFocal = Float.MAX_VALUE;
+        for (LensInfo lens : lenses) {
+            if (!lens.isPhysical && lens.equivFocalLengthMm > 0 && lens.equivFocalLengthMm < minFocal) {
+                minFocal = lens.equivFocalLengthMm;
+            }
+        }
+        if (minFocal == Float.MAX_VALUE) minFocal = 1.0f; // fallback
+        return minFocal;
     }
 }

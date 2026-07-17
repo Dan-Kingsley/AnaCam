@@ -125,10 +125,19 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
         }
 
         if( !is_multi_cam && !has_physical_cameras ) {
-            Preference pref = findPreference("preference_multi_cam_button");
-            //PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_gui");
+            Preference pref = findPreference("preference_multi_cam_mode");
             PreferenceGroup pg = (PreferenceGroup)this.findPreference("preferences_root");
             pg.removePreference(pref);
+        }
+
+        // Remove display format preference if not in individual mode
+        String multiCamMode = sharedPreferences.getString(PreferenceKeys.MultiCamModePreferenceKey, "menu");
+        if( !multiCamMode.equals("individual") || (!is_multi_cam && !has_physical_cameras) ) {
+            Preference pref = findPreference("preference_individual_cam_display_format");
+            if( pref != null ) {
+                PreferenceGroup pg = (PreferenceGroup)this.findPreference("preferences_root");
+                pg.removePreference(pref);
+            }
         }
 
         if( MyDebug.LOG )

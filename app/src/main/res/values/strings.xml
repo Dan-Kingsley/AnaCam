@@ -953,7 +953,18 @@
     <string name="switch_to_unknown_camera">Switch camera</string>
     <string name="switch_multi_camera">Switch between multiple cameras</string>
     <string name="preference_multi_cam_button">Multiple cameras icon</string>
-    <string name="preference_multi_cam_button_summary">If enabled, use separate buttons to switch between front/back cameras, and to switch between multiple front/back facing cameras. If disabled, the Switch Camera icon will cycle through all cameras.</string>
+    <string name="preference_multi_cam_button_summary">Choose how to switch between multiple cameras: as a menu dialog, as individual lens icons above the shutter button, or disable entirely.\n%s</string>
+    <string name="multi_cam_mode_off">Off</string>
+    <string name="multi_cam_mode_menu">Choose camera menu</string>
+    <string name="multi_cam_mode_individual">Individual camera icons</string>
+    <string name="display_format_multiplier">Zoom multiplier (0.5x, 1x, 5x)</string>
+    <string name="display_format_mm">Focal length in mm (25mm, 50mm, 200mm)</string>
+    <string name="preference_individual_cam_display_format">Lens label format</string>
+    <string name="preference_individual_cam_display_format_summary">How to display lens labels on the individual camera icons\n%s</string>
+    <string name="preference_individual_cam_favorites">Favorite lenses</string>
+    <string name="preference_individual_cam_favorites_summary">Select which lenses appear in the individual camera icons row. If none are selected, all lenses are shown.</string>
+    <string name="preference_individual_cam_custom_names">Custom lens names</string>
+    <string name="preference_individual_cam_custom_names_summary">Override auto-detected lens labels with custom names</string>
 
     <string name="preference_show_camera_id">Show camera ID</string>
     <string name="preference_show_camera_id_summary">Display the current camera ID number on screen</string>

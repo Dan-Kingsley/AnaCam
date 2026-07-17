@@ -59,6 +59,26 @@
         android:visibility="gone"
         />
 
+    <HorizontalScrollView
+        android:id="@+id/individual_cam_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/take_photo"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone"
+        android:scrollbars="none"
+        android:fadeScrollbars="false"
+        >
+        <LinearLayout
+            android:id="@+id/individual_cam_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            />
+    </HorizontalScrollView>
+
     <ImageButton
         android:id="@+id/pause_video"
         android:layout_width="70dp"
