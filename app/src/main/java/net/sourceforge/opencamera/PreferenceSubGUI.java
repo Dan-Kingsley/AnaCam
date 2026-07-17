@@ -270,19 +270,13 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
 
             // Load saved favorites and validate they still exist
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-            String savedJson = prefs.getString(PreferenceKeys.IndividualCamFavoritesKey, null);
+            Set<String> savedJsonSet = prefs.getStringSet(PreferenceKeys.IndividualCamFavoritesKey, null);
             Set<String> savedFavorites = new HashSet<>();
-            if( savedJson != null && !savedJson.isEmpty() ) {
-                try {
-                    JSONArray arr = new JSONArray(savedJson);
-                    Set<String> validKeys = new HashSet<>(values);
-                    for (int i = 0; i < arr.length(); i++) {
-                        String key = arr.getString(i);
-                        if( validKeys.contains(key) )
-                            savedFavorites.add(key);
-                    }
-                } catch(JSONException e) {
-                    // ignore
+            if( savedJsonSet != null ) {
+                Set<String> validKeys = new HashSet<>(values);
+                for (String key : savedJsonSet) {
+                    if( validKeys.contains(key) )
+                        savedFavorites.add(key);
                 }
             }
 

@@ -214,21 +214,13 @@ public class IndividualCamView {
         return prefs.getString(PreferenceKeys.IndividualCamDisplayFormatKey, "multiplier");
     }
 
-    /** Read the favorites set from preferences (stored as JSON array). */
+    /** Read the favorites set from preferences (stored by MultiSelectListPreference as StringSet). */
     private Set<String> getFavorites() {
         Set<String> result = new HashSet<>();
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
-        String json = prefs.getString(PreferenceKeys.IndividualCamFavoritesKey, null);
-        if (json != null && !json.isEmpty()) {
-            try {
-                JSONArray arr = new JSONArray(json);
-                for (int i = 0; i < arr.length(); i++) {
-                    result.add(arr.getString(i));
-                }
-            } catch (JSONException e) {
-                if (MyDebug.LOG)
-                    Log.e(TAG, "Failed to parse favorites JSON", e);
-            }
+        Set<String> savedSet = prefs.getStringSet(PreferenceKeys.IndividualCamFavoritesKey, null);
+        if( savedSet != null ) {
+            result.addAll(savedSet);
         }
         return result;
     }
