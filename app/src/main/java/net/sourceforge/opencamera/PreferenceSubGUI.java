@@ -237,8 +237,8 @@ public class PreferenceSubGUI extends PreferenceSubScreen {
 
             List<CameraControllerManager2.LensInfo> lenses = camManager2.getAvailableLenses(getActivity(), currentLogicalCameraId, physicalCameraIds);
 
-            List<CharSequence> entries = new ArrayList<>();
-            List<CharSequence> values = new ArrayList<>();
+            List<String> entries = new ArrayList<>();
+            List<String> values = new ArrayList<>();
 
             for (CameraControllerManager2.LensInfo lens : lenses) {
                 entries.add(lens.defaultLabel);
