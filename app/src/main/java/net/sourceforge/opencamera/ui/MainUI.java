@@ -658,13 +658,22 @@ public class MainUI {
             layoutParams.addRule(align_parent_bottom, 0);
             layoutParams.addRule(center_vertical, RelativeLayout.TRUE);
             layoutParams.addRule(center_horizontal, 0);
+            layoutParams.addRule(RelativeLayout.ABOVE, 0);
+            layoutParams.addRule(RelativeLayout.BELOW, 0);
+            layoutParams.addRule(RelativeLayout.LEFT_OF, 0);
+            layoutParams.addRule(RelativeLayout.RIGHT_OF, 0);
             layoutParams.addRule(left_of, R.id.take_photo);
-            layoutParams.addRule(ui_independent_below, 0);
-            layoutParams.addRule(ui_independent_left_of, 0);
-            layoutParams.addRule(ui_independent_right_of, 0);
             setMarginsForSystemUI(layoutParams, 0, 0, navigation_gap, 0);
             view.setLayoutParams(layoutParams);
             setViewRotation(view, ui_rotation);
+
+            {
+                View rowView = main_activity.findViewById(R.id.individual_cam_row);
+                if( rowView instanceof LinearLayout ) {
+                    LinearLayout individualCamRow = (LinearLayout)rowView;
+                    individualCamRow.setOrientation(system_orientation_portrait ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+                }
+            }
 
             view = main_activity.findViewById(R.id.pause_video);
             layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();

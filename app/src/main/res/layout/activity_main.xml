@@ -59,7 +59,7 @@
         android:visibility="gone"
         />
 
-    <HorizontalScrollView
+    <FrameLayout
         android:id="@+id/individual_cam_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -67,8 +67,6 @@
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="8dp"
         android:visibility="gone"
-        android:scrollbars="none"
-        android:fadeScrollbars="false"
         >
         <LinearLayout
             android:id="@+id/individual_cam_row"
@@ -77,7 +75,7 @@
             android:orientation="horizontal"
             android:gravity="center"
             />
-    </HorizontalScrollView>
+    </FrameLayout>
 
     <ImageButton
         android:id="@+id/pause_video"
