@@ -32,7 +32,7 @@ public class DngTagEditor {
             case 2: return 1; // ASCII
             case 3: return 2; // SHORT
             case 4: return 4; // LONG
-            case 5: return 8; // SRATIONAL
+            case 5: return 8; // RATIONAL
             case 6: return 1; // SBYTE
             case 7: return 1; // UNDEFINED
             case 8: return 2; // SSHORT
@@ -248,6 +248,76 @@ public class DngTagEditor {
             }
         }
 
+        // 10. Fix up sub-IFD offsets
+        //     Sub-IFDs (ExifIFD, GPSInfo, SubIFD) were shifted in step 7, but their internal
+        //     entry offsets and inline pointer values in the main IFD were not corrected.
+        for( int i = 0; i < numEntries + 1; i++ ) {
+            int entryPos = ifdOffset + 2 + (i * IFD_ENTRY_SIZE);
+            int tagId = resultBuf.getShort(entryPos) & 0xFFFF;
+            int count = resultBuf.getInt(entryPos + 4);
+            int valueOrOffset = resultBuf.getInt(entryPos + 8);
+
+            int[] subIFDOffsets = null;
+
+            if( tagId == 330 ) { // SubIFD
+                if( count == 1 ) {
+                    if( valueOrOffset >= insertPos ) {
+                        resultBuf.position(entryPos + 8);
+                        resultBuf.putInt(valueOrOffset + shift);
+                        if( MyDebug.LOG )
+                            Log.d(TAG, "Fixed inline SubIFD pointer: " + valueOrOffset + " -> " + (valueOrOffset + shift));
+                        subIFDOffsets = new int[]{ valueOrOffset + shift };
+                    }
+                    else {
+                        subIFDOffsets = new int[]{ valueOrOffset };
+                    }
+                }
+                else if( count > 1 ) {
+                    // Non-inline: step 9 already shifted this offset if needed
+                    int arrayOffset = valueOrOffset;
+                    subIFDOffsets = new int[count];
+                    for( int j = 0; j < count; j++ ) {
+                        int subOffset = resultBuf.getInt(arrayOffset + j * 4);
+                        if( subOffset >= insertPos ) {
+                            int newSubOffset = subOffset + shift;
+                            resultBuf.putInt(arrayOffset + j * 4, newSubOffset);
+                            subIFDOffsets[j] = newSubOffset;
+                            if( MyDebug.LOG )
+                                Log.d(TAG, "Fixed SubIFD[" + j + "] offset: " + subOffset + " -> " + newSubOffset);
+                        }
+                        else {
+                            subIFDOffsets[j] = subOffset;
+                        }
+                    }
+                }
+            }
+            else if( tagId == 34665 || tagId == 34853 || tagId == 34856 ) { // ExifIFD / GPSInfo / InteropIFD
+                if( valueOrOffset >= insertPos ) {
+                    resultBuf.position(entryPos + 8);
+                    resultBuf.putInt(valueOrOffset + shift);
+                    if( MyDebug.LOG )
+                        Log.d(TAG, "Fixed inline " + (tagId == 34665 ? "ExifIFD" : tagId == 34853 ? "GPSInfo" : "InteropIFD") + " pointer: "
+                            + valueOrOffset + " -> " + (valueOrOffset + shift));
+                    subIFDOffsets = new int[]{ valueOrOffset + shift };
+                }
+                else {
+                    subIFDOffsets = new int[]{ valueOrOffset };
+                }
+            }
+
+            if( subIFDOffsets != null ) {
+                for( int subOffset : subIFDOffsets ) {
+                    if( subOffset < TIFF_HEADER_SIZE || subOffset + 2 >= result.length ) {
+                        continue;
+                    }
+                    int subNumEntries = resultBuf.getShort(subOffset) & 0xFFFF;
+                    if( subNumEntries > 0 && subOffset + 2 + subNumEntries * IFD_ENTRY_SIZE + 4 <= result.length ) {
+                        fixupSubIFDEntries(resultBuf, subOffset, subNumEntries, insertPos, shift);
+                    }
+                }
+            }
+        }
+
         if( MyDebug.LOG )
             Log.d(TAG, "Rebuilt DNG with PixelAspectRatio, new size: " + newFileSize);
 
@@ -290,5 +360,23 @@ public class DngTagEditor {
             a = temp;
         }
         return a;
+    }
+
+    private static void fixupSubIFDEntries(ByteBuffer buf, int ifdOffset, int numEntries,
+                                            int insertPos, int shift) {
+        for( int i = 0; i < numEntries; i++ ) {
+            int entryPos = ifdOffset + 2 + (i * IFD_ENTRY_SIZE);
+            int tagId = buf.getShort(entryPos) & 0xFFFF;
+            int type = buf.getShort(entryPos + 2) & 0xFFFF;
+            int count = buf.getInt(entryPos + 4);
+            int offsetVal = buf.getInt(entryPos + 8);
+
+            if( !isInline(type, count) && offsetVal >= insertPos ) {
+                buf.position(entryPos + 8);
+                buf.putInt(offsetVal + shift);
+                if( MyDebug.LOG )
+                    Log.d(TAG, "Fixed up sub-IFD offset for tag " + tagId + ": " + offsetVal + " -> " + (offsetVal + shift));
+            }
+        }
     }
 }
