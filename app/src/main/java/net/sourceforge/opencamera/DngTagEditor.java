@@ -7,18 +7,21 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 
 /** Post-processes a DNG/TIFF file to add a PixelAspectRatio tag for anamorphic desqueeze.
- *  The PixelAspectRatio tag tells RAW processing software to stretch the image horizontally
- *  by the given factor, effectively desqueezing it.
+ *  Both the TIFF tag (50289) and the embedded XMP metadata (tag 700) are updated so that
+ *  viewers which prefer XMP over TIFF tags will also honour the aspect ratio.
  */
 public class DngTagEditor {
     private static final String TAG = "DngTagEditor";
 
     private static final int TAG_IMAGE_WIDTH = 256;
     private static final int TAG_IMAGE_LENGTH = 257;
+    private static final int TAG_XMP = 700;
     private static final int TAG_PIXEL_ASPECT_RATIO = 50289;
 
+    private static final int TYPE_BYTE = 1;
     private static final int TYPE_SHORT = 3;
     private static final int TYPE_LONG = 4;
     private static final int TYPE_RATIONAL = 5;
@@ -73,10 +76,7 @@ public class DngTagEditor {
     }
 
     /** Applies desqueeze tags to raw DNG byte data.
-     *  @param data The DNG file data.
-     *  @param desqueezeFactor The desqueeze factor (1.33f or 1.55f).
-     *  @return The modified DNG data.
-     *  @throws IOException if the data is not a valid DNG/TIFF file.
+     *  Updates both the PixelAspectRatio TIFF tag (50289) and the embedded XMP metadata (tag 700).
      */
     public static byte[] applyDesqueezeToBytes(byte[] data, float desqueezeFactor) throws IOException {
         if( MyDebug.LOG )
@@ -110,11 +110,12 @@ public class DngTagEditor {
         if( MyDebug.LOG )
             Log.d(TAG, "IFD entries: " + numEntries);
 
-        int oldIfdSize = 2 + numEntries * IFD_ENTRY_SIZE + 4; // count + entries + next-ifd-offset
+        int oldIfdSize = 2 + numEntries * IFD_ENTRY_SIZE + 4;
 
         int imageWidth = 0;
         int imageLength = 0;
         int pixelAspectRatioEntryIndex = -1;
+        int xmpEntryIndex = -1;
 
         for( int i = 0; i < numEntries; i++ ) {
             int entryPos = ifdOffset + 2 + (i * IFD_ENTRY_SIZE);
@@ -140,6 +141,11 @@ public class DngTagEditor {
                 if( MyDebug.LOG )
                     Log.d(TAG, "PixelAspectRatio already exists at entry " + i);
             }
+            else if( tagId == TAG_XMP ) {
+                xmpEntryIndex = i;
+                if( MyDebug.LOG )
+                    Log.d(TAG, "XMP tag 700 found at entry " + i);
+            }
         }
 
         if( imageWidth == 0 || imageLength == 0 ) {
@@ -148,27 +154,55 @@ public class DngTagEditor {
 
         int[] rational = floatToRational(desqueezeFactor);
 
-        if( pixelAspectRatioEntryIndex >= 0 ) {
-            // Tag already exists — update its value in place (8 bytes at the data offset)
+        // Phase 1: Read and modify the XMP data if present
+        byte[] modifiedXmp = null;
+        int xmpDataOffset = -1;
+        int xmpDataCount = 0;
+
+        if( xmpEntryIndex >= 0 ) {
+            int entryPos = ifdOffset + 2 + (xmpEntryIndex * IFD_ENTRY_SIZE);
+            buf.position(entryPos + 4);
+            xmpDataCount = buf.getInt();
+            xmpDataOffset = buf.getInt();
+            if( xmpDataOffset > 0 && xmpDataOffset + xmpDataCount <= data.length ) {
+                byte[] xmpBytes = new byte[xmpDataCount];
+                buf.position(xmpDataOffset);
+                buf.get(xmpBytes);
+                modifiedXmp = modifyXmpForDesqueeze(xmpBytes, desqueezeFactor);
+                if( MyDebug.LOG )
+                    Log.d(TAG, "XMP modified: " + xmpDataCount + " -> " + modifiedXmp.length + " bytes");
+            }
+        }
+
+        int xmpSizeDelta = (modifiedXmp != null) ? (modifiedXmp.length - xmpDataCount) : 0;
+        int ifdEntryDelta = (pixelAspectRatioEntryIndex < 0) ? IFD_ENTRY_SIZE : 0;
+        int totalShift = ifdEntryDelta + xmpSizeDelta;
+
+        // If the tag already exists and XMP didn't change size, update in place
+        if( pixelAspectRatioEntryIndex >= 0 && totalShift == 0 ) {
             int entryPos = ifdOffset + 2 + (pixelAspectRatioEntryIndex * IFD_ENTRY_SIZE);
             buf.position(entryPos + 8);
             int dataOffset = buf.getInt();
-            // dataOffset is where the 8-byte RATIONAL value lives in the file
             buf.position(dataOffset);
             buf.putInt(rational[0]);
             buf.putInt(rational[1]);
             if( MyDebug.LOG )
                 Log.d(TAG, "Updated PixelAspectRatio to " + rational[0] + "/" + rational[1] + " at offset " + dataOffset);
+
+            // Update XMP in place if same size
+            if( modifiedXmp != null && xmpSizeDelta == 0 ) {
+                buf.position(xmpDataOffset);
+                buf.put(modifiedXmp);
+                if( MyDebug.LOG )
+                    Log.d(TAG, "Updated XMP in place at offset " + xmpDataOffset);
+            }
             return data;
         }
 
-        // PixelAspectRatio tag doesn't exist — need to add it to the IFD.
-        // Rebuild the file: insert a new IFD entry and append the rational value at the end.
-
-        int newIfdSize = 2 + (numEntries + 1) * IFD_ENTRY_SIZE + 4;
-        int shift = newIfdSize - oldIfdSize; // always 12
-        int rationalDataOffset = data.length + shift; // where the new rational value will be in the new file
-        int newFileSize = data.length + shift + 8;
+        // Need to rebuild the file
+        int newIfdSize = 2 + (numEntries + (pixelAspectRatioEntryIndex < 0 ? 1 : 0)) * IFD_ENTRY_SIZE + 4;
+        int rationalDataOffset = data.length + totalShift;
+        int newFileSize = data.length + totalShift + 8;
 
         byte[] result = new byte[newFileSize];
         ByteBuffer resultBuf = ByteBuffer.wrap(result).order(byteOrder);
@@ -178,12 +212,14 @@ public class DngTagEditor {
 
         // 2. Find insertion point in IFD (sorted by tag ID)
         int insertIndex = numEntries;
-        for( int i = 0; i < numEntries; i++ ) {
-            int entryPos = ifdOffset + 2 + (i * IFD_ENTRY_SIZE);
-            int existingTag = buf.getShort(entryPos) & 0xFFFF;
-            if( TAG_PIXEL_ASPECT_RATIO < existingTag ) {
-                insertIndex = i;
-                break;
+        if( pixelAspectRatioEntryIndex < 0 ) {
+            for( int i = 0; i < numEntries; i++ ) {
+                int entryPos = ifdOffset + 2 + (i * IFD_ENTRY_SIZE);
+                int existingTag = buf.getShort(entryPos) & 0xFFFF;
+                if( TAG_PIXEL_ASPECT_RATIO < existingTag ) {
+                    insertIndex = i;
+                    break;
+                }
             }
         }
         int insertPos = ifdOffset + 2 + (insertIndex * IFD_ENTRY_SIZE);
@@ -193,30 +229,68 @@ public class DngTagEditor {
         // 3. Copy data before the insertion point (unchanged)
         System.arraycopy(data, 0, result, 0, insertPos);
 
-        // 4. Write new PixelAspectRatio IFD entry
-        resultBuf.position(insertPos);
-        resultBuf.putShort((short) TAG_PIXEL_ASPECT_RATIO);
-        resultBuf.putShort((short) TYPE_RATIONAL);
-        resultBuf.putInt(1); // count = 1 rational
-        resultBuf.putInt(rationalDataOffset);
+        // 4. Write new PixelAspectRatio IFD entry (if needed)
+        if( pixelAspectRatioEntryIndex < 0 ) {
+            resultBuf.position(insertPos);
+            resultBuf.putShort((short) TAG_PIXEL_ASPECT_RATIO);
+            resultBuf.putShort((short) TYPE_RATIONAL);
+            resultBuf.putInt(1);
+            resultBuf.putInt(rationalDataOffset);
+        }
 
         // 5. Copy original IFD entries after insertion point + next-ifd-offset
-        //    These go at insertPos + IFD_ENTRY_SIZE in the new file
         int afterInsertSrc = insertPos;
-        int afterInsertDst = insertPos + IFD_ENTRY_SIZE;
+        int afterInsertDst = insertPos + ifdEntryDelta;
         int afterInsertLen = (ifdOffset + oldIfdSize) - afterInsertSrc;
         System.arraycopy(data, afterInsertSrc, result, afterInsertDst, afterInsertLen);
 
         // 6. Update IFD entry count
-        resultBuf.position(ifdOffset);
-        resultBuf.putShort((short) (numEntries + 1));
+        if( pixelAspectRatioEntryIndex < 0 ) {
+            resultBuf.position(ifdOffset);
+            resultBuf.putShort((short) (numEntries + 1));
+        }
 
-        // 7. Copy everything after the old IFD (tag data, sub-IFDs, image data)
-        //    These are shifted right by 'shift' bytes
+        // 7. Copy everything after the old IFD, inserting modified XMP at the correct position
         int afterIfdSrc = ifdOffset + oldIfdSize;
         int afterIfdDst = ifdOffset + newIfdSize;
-        int afterIfdLen = data.length - afterIfdSrc;
-        System.arraycopy(data, afterIfdSrc, result, afterIfdDst, afterIfdLen);
+
+        if( modifiedXmp != null && xmpDataOffset >= afterIfdSrc ) {
+            // Data before XMP
+            int xmpRelativeOffset = xmpDataOffset - afterIfdSrc;
+            if( xmpRelativeOffset > 0 ) {
+                System.arraycopy(data, afterIfdSrc, result, afterIfdDst, xmpRelativeOffset);
+            }
+
+            // Write modified XMP at the shifted position
+            int xmpDstOffset = afterIfdDst + xmpRelativeOffset;
+            resultBuf.position(xmpDstOffset);
+            resultBuf.put(modifiedXmp);
+            if( MyDebug.LOG )
+                Log.d(TAG, "Wrote modified XMP at offset " + xmpDstOffset + " (" + modifiedXmp.length + " bytes)");
+
+            // Update the XMP tag entry's count and offset in the result IFD
+            if( xmpEntryIndex >= 0 ) {
+                int newXmpEntryIndex = xmpEntryIndex + (xmpEntryIndex >= insertIndex && pixelAspectRatioEntryIndex < 0 ? 1 : 0);
+                int xmpEntryPos = ifdOffset + 2 + (newXmpEntryIndex * IFD_ENTRY_SIZE);
+                resultBuf.position(xmpEntryPos + 4);
+                resultBuf.putInt(modifiedXmp.length);
+            }
+
+            // Data after XMP
+            int afterXmpSrc = xmpDataOffset + xmpDataCount;
+            int afterXmpDst = xmpDstOffset + modifiedXmp.length;
+            int afterXmpLen = data.length - afterXmpSrc;
+            if( afterXmpLen > 0 ) {
+                System.arraycopy(data, afterXmpSrc, result, afterXmpDst, afterXmpLen);
+            }
+        }
+        else {
+            // No XMP modification, just copy everything
+            int afterIfdLen = data.length - afterIfdSrc;
+            if( afterIfdLen > 0 ) {
+                System.arraycopy(data, afterIfdSrc, result, afterIfdDst, afterIfdLen);
+            }
+        }
 
         // 8. Write the rational value at the end
         resultBuf.position(rationalDataOffset);
@@ -225,10 +299,8 @@ public class DngTagEditor {
         if( MyDebug.LOG )
             Log.d(TAG, "Wrote PixelAspectRatio " + rational[0] + "/" + rational[1] + " at offset " + rationalDataOffset);
 
-        // 9. Fix up offsets in the new IFD entries
-        //    Any offset that pointed to data at or after the insertion point needs +shift
-        //    (because everything at or after insertPos was shifted right by 'shift' bytes)
-        for( int i = 0; i < numEntries + 1; i++ ) {
+        // 9. Fix up offsets in the main IFD entries
+        for( int i = 0; i < numEntries + (pixelAspectRatioEntryIndex < 0 ? 1 : 0); i++ ) {
             int entryPos = ifdOffset + 2 + (i * IFD_ENTRY_SIZE);
             int tagId = resultBuf.getShort(entryPos) & 0xFFFF;
             int type = resultBuf.getShort(entryPos + 2) & 0xFFFF;
@@ -236,22 +308,26 @@ public class DngTagEditor {
             int offsetVal = resultBuf.getInt(entryPos + 8);
 
             if( tagId == TAG_PIXEL_ASPECT_RATIO ) {
-                // This is our new entry — its offset was set to the correct position
                 continue;
+            }
+
+            // Calculate the effective shift for this offset
+            int effectiveShift = totalShift;
+            if( modifiedXmp != null && xmpDataOffset >= afterIfdSrc && offsetVal > xmpDataOffset ) {
+                // Offset points past the XMP data — include the XMP size delta
+                effectiveShift = totalShift;
             }
 
             if( !isInline(type, count) && offsetVal >= insertPos ) {
                 resultBuf.position(entryPos + 8);
-                resultBuf.putInt(offsetVal + shift);
+                resultBuf.putInt(offsetVal + effectiveShift);
                 if( MyDebug.LOG )
-                    Log.d(TAG, "Fixed up offset for tag " + tagId + ": " + offsetVal + " -> " + (offsetVal + shift));
+                    Log.d(TAG, "Fixed up offset for tag " + tagId + ": " + offsetVal + " -> " + (offsetVal + effectiveShift));
             }
         }
 
         // 10. Fix up sub-IFD offsets
-        //     Sub-IFDs (ExifIFD, GPSInfo, SubIFD) were shifted in step 7, but their internal
-        //     entry offsets and inline pointer values in the main IFD were not corrected.
-        for( int i = 0; i < numEntries + 1; i++ ) {
+        for( int i = 0; i < numEntries + (pixelAspectRatioEntryIndex < 0 ? 1 : 0); i++ ) {
             int entryPos = ifdOffset + 2 + (i * IFD_ENTRY_SIZE);
             int tagId = resultBuf.getShort(entryPos) & 0xFFFF;
             int count = resultBuf.getInt(entryPos + 4);
@@ -261,25 +337,26 @@ public class DngTagEditor {
 
             if( tagId == 330 ) { // SubIFD
                 if( count == 1 ) {
+                    // Inline pointer — step 9 did NOT shift it (isInline returns true)
                     if( valueOrOffset >= insertPos ) {
                         resultBuf.position(entryPos + 8);
-                        resultBuf.putInt(valueOrOffset + shift);
+                        resultBuf.putInt(valueOrOffset + totalShift);
                         if( MyDebug.LOG )
-                            Log.d(TAG, "Fixed inline SubIFD pointer: " + valueOrOffset + " -> " + (valueOrOffset + shift));
-                        subIFDOffsets = new int[]{ valueOrOffset + shift };
+                            Log.d(TAG, "Fixed inline SubIFD pointer: " + valueOrOffset + " -> " + (valueOrOffset + totalShift));
+                        subIFDOffsets = new int[]{ valueOrOffset + totalShift };
                     }
                     else {
                         subIFDOffsets = new int[]{ valueOrOffset };
                     }
                 }
                 else if( count > 1 ) {
-                    // Non-inline: step 9 already shifted this offset if needed
+                    // Non-inline: step 9 already shifted the array pointer
                     int arrayOffset = valueOrOffset;
                     subIFDOffsets = new int[count];
                     for( int j = 0; j < count; j++ ) {
                         int subOffset = resultBuf.getInt(arrayOffset + j * 4);
                         if( subOffset >= insertPos ) {
-                            int newSubOffset = subOffset + shift;
+                            int newSubOffset = subOffset + totalShift;
                             resultBuf.putInt(arrayOffset + j * 4, newSubOffset);
                             subIFDOffsets[j] = newSubOffset;
                             if( MyDebug.LOG )
@@ -294,11 +371,11 @@ public class DngTagEditor {
             else if( tagId == 34665 || tagId == 34853 || tagId == 34856 ) { // ExifIFD / GPSInfo / InteropIFD
                 if( valueOrOffset >= insertPos ) {
                     resultBuf.position(entryPos + 8);
-                    resultBuf.putInt(valueOrOffset + shift);
+                    resultBuf.putInt(valueOrOffset + totalShift);
                     if( MyDebug.LOG )
                         Log.d(TAG, "Fixed inline " + (tagId == 34665 ? "ExifIFD" : tagId == 34853 ? "GPSInfo" : "InteropIFD") + " pointer: "
-                            + valueOrOffset + " -> " + (valueOrOffset + shift));
-                    subIFDOffsets = new int[]{ valueOrOffset + shift };
+                            + valueOrOffset + " -> " + (valueOrOffset + totalShift));
+                    subIFDOffsets = new int[]{ valueOrOffset + totalShift };
                 }
                 else {
                     subIFDOffsets = new int[]{ valueOrOffset };
@@ -312,16 +389,90 @@ public class DngTagEditor {
                     }
                     int subNumEntries = resultBuf.getShort(subOffset) & 0xFFFF;
                     if( subNumEntries > 0 && subOffset + 2 + subNumEntries * IFD_ENTRY_SIZE + 4 <= result.length ) {
-                        fixupSubIFDEntries(resultBuf, subOffset, subNumEntries, insertPos, shift);
+                        fixupSubIFDEntries(resultBuf, subOffset, subNumEntries, insertPos, totalShift);
                     }
                 }
             }
         }
 
         if( MyDebug.LOG )
-            Log.d(TAG, "Rebuilt DNG with PixelAspectRatio, new size: " + newFileSize);
+            Log.d(TAG, "Rebuilt DNG with PixelAspectRatio and XMP, new size: " + newFileSize);
 
         return result;
+    }
+
+    /** Modifies the XMP packet to add or update aux:PixelAspectRatio for anamorphic desqueeze.
+     *  @return Modified XMP bytes (may be different length from input).
+     */
+    private static byte[] modifyXmpForDesqueeze(byte[] xmpBytes, float desqueezeFactor) {
+        String xmp = new String(xmpBytes, StandardCharsets.UTF_8);
+        int[] rational = floatToRational(desqueezeFactor);
+        String newValue = rational[0] + "/" + rational[1];
+
+        // Try to find and replace existing aux:PixelAspectRatio attribute
+        // Format: aux:PixelAspectRatio="1/1" or aux:PixelAspectRatio="4/3"
+        String attrPattern = "aux:PixelAspectRatio=\"";
+        int attrIdx = xmp.indexOf(attrPattern);
+        if( attrIdx >= 0 ) {
+            int valueStart = attrIdx + attrPattern.length();
+            int valueEnd = xmp.indexOf('"', valueStart);
+            if( valueEnd > valueStart ) {
+                String newXmp = xmp.substring(0, valueStart) + newValue + xmp.substring(valueEnd);
+                if( MyDebug.LOG )
+                    Log.d(TAG, "Updated XMP aux:PixelAspectRatio attribute to " + newValue);
+                return newXmp.getBytes(StandardCharsets.UTF_8);
+            }
+        }
+
+        // Try to find and replace existing aux:PixelAspectRatio element
+        // Format: <aux:PixelAspectRatio>1/1</aux:PixelAspectRatio>
+        String elemOpen = "<aux:PixelAspectRatio>";
+        String elemClose = "</aux:PixelAspectRatio>";
+        int elemIdx = xmp.indexOf(elemOpen);
+        if( elemIdx >= 0 ) {
+            int valueStart = elemIdx + elemOpen.length();
+            int valueEnd = xmp.indexOf(elemClose, valueStart);
+            if( valueEnd > valueStart ) {
+                String newXmp = xmp.substring(0, valueStart) + newValue + xmp.substring(valueEnd);
+                if( MyDebug.LOG )
+                    Log.d(TAG, "Updated XMP aux:PixelAspectRatio element to " + newValue);
+                return newXmp.getBytes(StandardCharsets.UTF_8);
+            }
+        }
+
+        // Not found — add aux:PixelAspectRatio as an attribute on the first rdf:Description
+        String descTag = "<rdf:Description";
+        int descIdx = xmp.indexOf(descTag);
+        if( descIdx >= 0 ) {
+            // Check if there's already a closing '>' for this tag
+            int tagEnd = xmp.indexOf('>', descIdx);
+            if( tagEnd > descIdx ) {
+                // Insert the attribute before the closing '>'
+                String attr = "\n    xmlns:aux=\"http://ns.adobe.com/exif/1.0/\"\n    aux:PixelAspectRatio=\"" + newValue + "\"";
+                String newXmp = xmp.substring(0, tagEnd) + attr + xmp.substring(tagEnd);
+                if( MyDebug.LOG )
+                    Log.d(TAG, "Added XMP aux:PixelAspectRatio attribute to " + newValue);
+                return newXmp.getBytes(StandardCharsets.UTF_8);
+            }
+        }
+
+        // Fallback: add as a new element inside rdf:RDF
+        String rdfClose = "</rdf:RDF>";
+        int rdfCloseIdx = xmp.indexOf(rdfClose);
+        if( rdfCloseIdx >= 0 ) {
+            String newElement = "  <rdf:Description xmlns:aux=\"http://ns.adobe.com/exif/1.0/\">\n" +
+                "    <aux:PixelAspectRatio>" + newValue + "</aux:PixelAspectRatio>\n" +
+                "  </rdf:Description>\n";
+            String newXmp = xmp.substring(0, rdfCloseIdx) + newElement + xmp.substring(rdfCloseIdx);
+            if( MyDebug.LOG )
+                Log.d(TAG, "Added XMP aux:PixelAspectRatio element to " + newValue);
+            return newXmp.getBytes(StandardCharsets.UTF_8);
+        }
+
+        // Last resort: return original unchanged
+        if( MyDebug.LOG )
+            Log.d(TAG, "Could not find suitable location in XMP to add PixelAspectRatio");
+        return xmpBytes;
     }
 
     private static int readIntFromOffset(ByteBuffer buf, int offset, int type) {

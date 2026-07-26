@@ -2473,20 +2473,30 @@ public class ImageSaver extends Thread {
                         DngTagEditor.applyDesqueeze(picFile, request.anamorphic_desqueeze_factor);
                     }
                     else if( saveUri != null ) {
-                        java.io.InputStream inputStream = main_activity.getContentResolver().openInputStream(saveUri);
-                        if( inputStream != null ) {
-                            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-                            byte[] buffer = new byte[8192];
-                            int bytesRead;
-                            while( (bytesRead = inputStream.read(buffer)) != -1 ) {
-                                baos.write(buffer, 0, bytesRead);
+                        java.io.InputStream inputStream = null;
+                        java.io.OutputStream uriOutput = null;
+                        try {
+                            inputStream = main_activity.getContentResolver().openInputStream(saveUri);
+                            if( inputStream != null ) {
+                                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                                byte[] buffer = new byte[8192];
+                                int bytesRead;
+                                while( (bytesRead = inputStream.read(buffer)) != -1 ) {
+                                    baos.write(buffer, 0, bytesRead);
+                                }
+                                byte[] dngData = DngTagEditor.applyDesqueezeToBytes(baos.toByteArray(), request.anamorphic_desqueeze_factor);
+                                uriOutput = main_activity.getContentResolver().openOutputStream(saveUri);
+                                if( uriOutput != null ) {
+                                    uriOutput.write(dngData);
+                                }
                             }
-                            inputStream.close();
-                            byte[] dngData = DngTagEditor.applyDesqueezeToBytes(baos.toByteArray(), request.anamorphic_desqueeze_factor);
-                            java.io.OutputStream uriOutput = main_activity.getContentResolver().openOutputStream(saveUri);
+                        }
+                        finally {
+                            if( inputStream != null ) {
+                                try { inputStream.close(); } catch(IOException e) { /* ignore */ }
+                            }
                             if( uriOutput != null ) {
-                                uriOutput.write(dngData);
-                                uriOutput.close();
+                                try { uriOutput.close(); } catch(IOException e) { /* ignore */ }
                             }
                         }
                     }
